@@ -1,0 +1,2099 @@
+diff --git a/drivers/flash/CMakeLists.txt b/drivers/flash/CMakeLists.txt
+index b72aa37a360..4be782d88d6 100644
+--- a/drivers/flash/CMakeLists.txt
++++ b/drivers/flash/CMakeLists.txt
+@@ -67,6 +67,8 @@ zephyr_library_sources_ifdef(CONFIG_SOC_FLASH_SMARTBOND flash_smartbond.c)
+ zephyr_library_sources_ifdef(CONFIG_SOC_FLASH_TELINK_B91 soc_flash_b91.c)
+ zephyr_library_sources_ifdef(CONFIG_SOC_FLASH_XMC4XXX soc_flash_xmc4xxx.c)
+ zephyr_library_sources_ifdef(CONFIG_SPI_FLASH_AT45 spi_flash_at45.c)
++zephyr_library_sources_ifdef(CONFIG_SPI_NAND bch.c)
++zephyr_library_sources_ifdef(CONFIG_SPI_NAND spi_nand.c)
+ zephyr_library_sources_ifdef(CONFIG_SPI_NOR spi_nor.c)
+ # zephyr-keep-sorted-stop
+ 
+diff --git a/drivers/flash/Kconfig b/drivers/flash/Kconfig
+index cfa34d3e1c4..9c0c7eb642e 100644
+--- a/drivers/flash/Kconfig
++++ b/drivers/flash/Kconfig
+@@ -181,6 +181,7 @@ source "drivers/flash/Kconfig.lpc"
+ source "drivers/flash/Kconfig.max32"
+ source "drivers/flash/Kconfig.mcux"
+ source "drivers/flash/Kconfig.mspi"
++source "drivers/flash/Kconfig.nand"
+ source "drivers/flash/Kconfig.nor"
+ source "drivers/flash/Kconfig.nordic_qspi_nor"
+ source "drivers/flash/Kconfig.npcx_fiu"
+diff --git a/drivers/flash/Kconfig.nand b/drivers/flash/Kconfig.nand
+new file mode 100644
+index 00000000000..d56b2e363c5
+--- /dev/null
++++ b/drivers/flash/Kconfig.nand
+@@ -0,0 +1,48 @@
++# Copyright (c) 2022-2025 Macronix International Co., Ltd.
++# SPDX-License-Identifier: Apache-2.0
++
++menuconfig SPI_NAND
++	bool "SPI NAND Flash"
++	default y
++	depends on DT_HAS_JEDEC_SPI_NAND_ENABLED
++	select FLASH_HAS_DRIVER_ENABLED
++	select FLASH_HAS_EXPLICIT_ERASE
++	select FLASH_HAS_PAGE_LAYOUT
++	select SPI
++
++if SPI_NAND
++
++config SPI_NAND_INIT_PRIORITY
++	int
++	default 80
++	help
++	  Device driver initialization priority.
++	  Device is connected to SPI bus, it has to
++	  be initialized after SPI driver.
++
++config SPI_NAND_SOFTWARE_ECC
++	bool
++	default n
++	help
++	  Enable this option to use software-based ECC (Error Correction Code)
++	  when accessing SPI NAND flash devices. This is useful for platforms
++	  that do not support hardware ECC, or when additional software control
++	  over ECC handling is required.
++
++config SPI_NAND_ECC_STEP_SIZE
++	int
++	default 512
++	depends on SPI_NAND_SOFTWARE_ECC
++	help
++	  Specifies the ECC (Error Correction Code) step size in bytes for SPI NAND
++	  flash operations. This value determines how many bytes of data are protected
++	  by one ECC block.
++
++config SPI_NAND_BCH_HEAP_SIZE
++	int
++	default 51200
++	help
++	  Specify the heap size (in bytes) reserved for BCH (Bose-Chaudhuri-Hocquenghem)
++	  error correction in SPI NAND flash operations.
++
++endif # SPI_NAND
+diff --git a/drivers/flash/bch.c b/drivers/flash/bch.c
+new file mode 100644
+index 00000000000..3fc052a2e9c
+--- /dev/null
++++ b/drivers/flash/bch.c
+@@ -0,0 +1,431 @@
++/*
++ * Copyright (c) 2022-2025 Macronix International Co., Ltd.
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++#include <stdint.h>
++#include <stdlib.h>
++#include <string.h>
++#include "bch.h"
++#include <zephyr/kernel.h>
++#include <zephyr/logging/log.h>
++
++#ifndef CONFIG_SPI_NAND_BCH_HEAP_SIZE
++#define CONFIG_SPI_NAND_BCH_HEAP_SIZE 51200
++#endif
++
++K_HEAP_DEFINE(bch_heap, CONFIG_SPI_NAND_BCH_HEAP_SIZE);
++LOG_MODULE_REGISTER(bch, CONFIG_FLASH_LOG_LEVEL);
++
++static void *bch_alloc(size_t size, int *err)
++{
++	void *ptr = NULL;
++
++	if (*err == 0) {
++		ptr = k_heap_alloc(&bch_heap, size, K_NO_WAIT);
++	}
++	if (ptr == NULL) {
++		*err = 1;
++	}
++	return ptr;
++}
++
++static inline uint32_t swap32_byte(uint32_t val)
++{
++	return (val & 0xff000000) >> 24 |
++			(val & 0x00ff0000) >> 8 |
++			(val & 0x0000ff00) << 8 |
++			(val & 0x000000ff) << 24;
++}
++
++static inline int mod(bch_t *bch, uint32_t v)
++{
++	while (v >= bch->n) {
++		v -= bch->n;
++		v = (v & bch->n) + (v >> bch->m);
++	}
++	return v;
++}
++
++static void build_syndrome(bch_t *bch)
++{
++	int i, j;
++	int ecc_bits;
++	uint32_t *ecc;
++
++	memset(bch->syn, 0, 2*bch->t*sizeof(*bch->syn));
++
++	ecc_bits = bch->ecc_bits;
++	ecc = bch->ecc;
++	while (ecc_bits > 0) {
++		i = ecc_bits - 32;
++		ecc_bits = i;
++		while (*ecc) {
++			if (*ecc & 1) {
++				for (j = 0; j < 2*bch->t; j++) {
++					bch->syn[j] ^= bch->a_pow[mod(bch, (j+1)*i)];
++				}
++		}
++			*ecc >>= 1;
++			i++;
++		}
++		ecc++;
++	}
++}
++
++static int build_error_location_poly(bch_t *bch)
++{
++	int i, j, k;
++	int deg, buf_deg, tmp_deg;
++	int pp = -1;
++	uint32_t tmp, dp = 1, d = bch->syn[0];
++
++	memset(bch->elp, 0, (bch->t + 1) * sizeof(*bch->elp));
++
++	buf_deg = 0;
++	bch->buf[0] = 1;
++	deg = 0;
++	bch->elp[0] = 1;
++
++	for (i = 0; (i < bch->t) && (deg <= bch->t); i++) {
++		if (d) {
++			k = 2*i-pp;
++			if (buf_deg+k > deg) {
++				tmp_deg = deg;
++				for (j = 0; j <= deg; j++) {
++					bch->buf2[j] = bch->elp[j];
++				}
++			}
++			tmp = bch->n + bch->a_log[d] - bch->a_log[dp];
++
++			for (j = 0; j <= buf_deg; j++) {
++				if (bch->buf[j]) {
++					bch->elp[j+k] ^= bch->a_pow[mod(bch, tmp + 
++						bch->a_log[bch->buf[j]])];
++				}
++			}
++			if (buf_deg+k > deg) {
++				deg = buf_deg+k;
++				buf_deg = tmp_deg;
++				for (j = 0; j <= tmp_deg; j++) {
++					bch->buf[j] = bch->buf2[j];
++				}
++				dp = d;
++				pp = 2*i;
++			}
++		}
++		if (i < bch->t - 1) {
++			k = 2*i+1;
++			d = bch->syn[k+1];
++			for (j = 1; j <= deg; j++) {
++				if (bch->elp[j] && bch->syn[k]) {
++					d ^= bch->a_pow[mod(bch, bch->a_log[bch->elp[j]] + 
++						bch->a_log[bch->syn[k]])];
++				}
++				k--;
++			}
++		}
++	}
++	return (deg > bch->t) ? -1 : deg;
++}
++
++static int chien_search(bch_t *bch, int deg)
++{
++	int i, j, k, nroot = 0;
++	int *rep  = (int *) bch->buf;
++	int *root = (int *) bch->buf2;
++	uint32_t syn, syn0;
++
++	k = bch->n - bch->a_log[bch->elp[deg]];
++	for (i = 0; i < deg; i++) {
++		rep[i] = bch->elp[i] ? mod(bch, bch->a_log[bch->elp[i]] + k) : -1;
++	}
++	rep[i] = 0;
++
++	syn0 = bch->elp[0] ? bch->a_pow[rep[0]] : 0;
++	for (i = 0; i <= bch->n; i++) {
++		for (j = 1, syn = syn0; j <= deg; j++) {
++			if (rep[j] >= 0) {
++				syn ^= bch->a_pow[mod(bch, rep[j] + j * i)];
++			}
++		}
++		if (syn == 0) {
++			root[nroot++] = bch->n - i;
++			if (nroot == deg) {
++				return nroot;
++			}
++		}
++	}
++	return EXIT_SUCCESS;
++}
++
++static void build_gf_table(bch_t *bch)
++{
++	uint32_t i, x;
++	uint32_t msb, poly;
++	uint32_t prim_poly[] = {0x11d, 0x211, 0x409, 0x805, 0x1053, 0x201b};
++
++	poly = prim_poly[bch->m - 8];
++	msb = 1 << bch->m;
++	bch->a_pow[0] = 1;
++	bch->a_log[1] = 0;
++	x = 2;
++	for (i = 1; i < bch->n; i++) {
++		bch->a_pow[i] = x;
++		bch->a_log[x] = i;
++		x <<= 1;
++		if (x & msb) {
++			x ^= poly;
++		}
++	}
++	bch->a_pow[bch->n] = 1;
++	bch->a_log[0] = 0;
++}
++
++static void build_mod_tables(bch_t *bch, const uint32_t *g)
++{
++	int i, j, b, d;
++	int plen = (bch->ecc_bits+32)/32;
++	int ecclen = (bch->ecc_bits+31)/32;
++	uint32_t data, hi, lo, *tab, poly;
++
++	memset(bch->mod_tab, 0, 16*4*bch->ecc_words*sizeof(*bch->mod_tab));
++
++	for (i = 0; i < 4; i++) {
++		for (b = 0; b < 16; b++) {
++			tab = bch->mod_tab + (b*4+i)*bch->ecc_words;
++			data = i << (2*b);
++			while (data) {
++				d = 0;
++				poly = (data >> 1);
++				while(poly) {
++					poly >>= 1;
++					d++;
++				}
++				data ^= g[0] >> (31-d);
++				for (j = 0; j < ecclen; j++) {
++					hi = (d < 31) ? g[j] << (d+1) : 0;
++					lo = (j+1 < plen) ? g[j+1] >> (31-d) : 0;
++					tab[j] ^= hi|lo;
++				}
++			}
++		}
++	}
++}
++
++static int build_generator_poly(bch_t *bch)
++{
++	int i, j, k, m, t;
++	uint32_t n;
++	uint32_t *x;
++
++	x = k_malloc(bch->m * (bch->t + 1) * sizeof(*x));
++	if (!x) {
++		return -ENOMEM;
++	}
++
++	for (t = 0, x[0] = 1, bch->ecc_bits = 0; t < bch->t; t++) {
++		for (m = 0, i = 2*t+1; m < bch->m; m++) {
++			x[bch->ecc_bits+1] = 1;
++			for (j = bch->ecc_bits; j > 0; j--) {
++				if (x[j]) {
++					x[j] = bch->a_pow[mod(bch, bch->a_log[x[j]] + i)] ^ x[j - 1];
++				} else {
++					x[j] = x[j-1];
++				}
++			}
++			if (x[j]) {
++				x[j] = bch->a_pow[mod(bch, bch->a_log[x[j]] + i)];
++			}
++			bch->ecc_bits++;
++			i = mod(bch, 2 * i);
++		}
++	}
++
++	for (k = bch->ecc_bits+1, i = 0; k > 0; k = k - n) {
++		n = (k > 32) ? 32 : k;
++		for (j = 0; j < n; j++) {
++			if (x[k-1-j])
++				bch->g[i] |= 1U << (31 - j);
++		}
++		i++;
++	}
++
++	free(x);
++	return EXIT_SUCCESS;
++}
++
++void bch_encode(bch_t *bch, uint8_t *data, uint8_t *ecc)
++{
++	int i, j, k, mlen;
++	uint32_t w;
++	uint32_t *p;
++	uint32_t *c[16];
++	uint32_t *t[16];
++
++	memset(bch->ecc, 0, bch->ecc_words * sizeof(*bch->ecc));
++	memset(bch->buf3, 0, bch->len);
++	memcpy(bch->buf3 + bch->ecc_words, data, bch->size_step);
++
++	t[0] = bch->mod_tab;
++	for (i = 1; i < 16; i++) {
++		t[i] = t[i-1] + 4*(bch->ecc_words);
++	}
++	p = bch->buf3;
++	mlen  = bch->len / 4;
++
++	while (mlen--) {
++		w = bch->le ? swap32_byte(*p) : *p;
++		p++;
++
++		w ^= bch->ecc[0];
++
++		k = 0;
++		for (i = 0; i < 16; i++) {
++			c[i] = t[i] + (bch->ecc_words)*((w >> k) & 0x03);
++			k = k + 2;
++		}
++
++		for (i = 0; i < bch->ecc_words-1; i++) {
++			bch->ecc[i] = bch->ecc[i+1];
++			for (j = 0; j < 16; j++) {
++				bch->ecc[i] ^= c[j][i];
++			}
++		}
++		bch->ecc[i] = c[0][i];
++		for (j = 1; j < 16; j++)
++			bch->ecc[i] ^= c[j][i];
++	}
++
++	if (ecc != NULL) {
++		for (i = 0; i < bch->ecc_words; i++) {
++			bch->ecc2[i] = swap32_byte(bch->ecc[i]);
++		}
++
++		memcpy(ecc, bch->ecc2, bch->ecc_bytes);
++	}
++}
++
++int bch_decode(bch_t *bch, uint8_t *data, uint8_t *ecc)
++{
++	int i, err = 0, nroot;
++	int *root = (int *) bch->buf2;
++	uint32_t nbits;
++
++	bch_encode(bch, data, NULL);
++	memcpy(bch->ecc2, ecc, bch->ecc_bytes);
++	for (i = 0; i < bch->ecc_words; i++) {
++		LOG_ERR("<word %d> %08X : %08X %s\r\n",
++			i, bch->ecc[i], swap32_byte(bch->ecc2[i]), bch->ecc[i] !=
++			swap32_byte(bch->ecc2[i]) ? "**" : "");
++		bch->ecc[i] ^= swap32_byte(bch->ecc2[i]);
++		err |= bch->ecc[i];
++	}
++	if (!err) {
++		return EXIT_SUCCESS;
++	}
++	build_syndrome(bch);
++	err = build_error_location_poly(bch);
++	if (err <= 0) {
++		return -1;
++	}
++	nroot = chien_search(bch, err);
++	if (err != nroot) {
++		return -1;
++	}
++	nbits = (bch->len * 8) + bch->ecc_bits;
++	for (i = 0; i < err; i++) {
++		root[i] = nbits - 1 - root[i];
++		root[i] = (root[i] & ~7) | (7-(root[i] & 7));
++
++		if ((root[i] / 8) < (bch->ecc_words * 4)) {
++			LOG_WRN("Error bit is in ecc range form byte 0 to %d, 
++				SKIP!!\r\n", root[i] / 8);
++			continue;
++		}
++		LOG_ERR("Before correct: <%d> %02X\r\n",
++				(root[i] / 8) - (bch->ecc_words * 4), data[(root[i] / 8)
++				- (bch->ecc_words * 4)]);
++
++		data[(root[i] / 8) - (bch->ecc_words * 4)] ^= 1 << root[i]%8;
++
++		LOG_ERR("After  correct: <%d> %02X\r\n",
++				(root[i] / 8) - (bch->ecc_words * 4), data[(root[i] / 8)
++				- (bch->ecc_words * 4)]);
++	}
++
++	return err;
++}
++
++int bch_init(int m, int t, uint32_t size_step, bch_t **bch_ret)
++{
++	bch_t *bch;
++	int err = 0;
++	uint32_t a = 1;
++	uint8_t *p = (uint8_t *)&a;
++	*bch_ret = 0;
++
++	if ((m < 8) || (m > 13) || (t < 1) || (t > 12)) {
++		LOG_DBG("bch init failed, params should be m: 8 ~ 13, t: 1 ~ 12\r\n");
++		return -EINVAL;
++	}
++	bch = k_malloc(sizeof(bch_t);
++
++	bch->le = (*p == 1);
++	LOG_DBG("This system is %s endian\r\n", bch->le ? "Little" : "Big");
++
++	bch->size_step = size_step;
++	bch->m = m;
++	bch->t = t;
++	bch->n = (1 << m)-1;
++
++	bch->ecc_words = (m * t + 31) / 32;
++	bch->len = (bch->n + 1) / 8;
++
++	bch->a_pow = bch_alloc((bch->n + 1)*sizeof(*bch->a_pow), &err);
++	bch->a_log = bch_alloc((bch->n + 1)*sizeof(*bch->a_log), &err);
++	bch->mod_tab = bch_alloc(bch->ecc_words * 16 * 4 * sizeof(*bch->mod_tab), &err);
++	bch->ecc = bch_alloc(bch->ecc_words * sizeof(*bch->ecc), &err);
++	bch->ecc2 = bch_alloc(bch->ecc_words * sizeof(*bch->ecc2), &err);
++	bch->buf = bch_alloc((t + 1) * sizeof(*bch->buf), &err);
++	bch->buf2 = bch_alloc((t + 1) * sizeof(*bch->buf2), &err);
++	bch->buf3 = bch_alloc(bch->len, &err);
++	bch->syn = bch_alloc(t * 2 * sizeof(*bch->syn), &err);
++	bch->elp = bch_alloc((t + 1) * sizeof(*bch->elp), &err);
++	bch->g = bch_alloc((bch->ecc_words + 1) * sizeof(*bch->g)), &err);
++
++	if (err) {
++		bch_free(bch);
++		return -ENOMEM;
++	}
++
++	build_gf_table(bch);
++	if (0 != build_generator_poly(bch)) {
++		bch_free(bch);
++		return -EINVAL;
++	}
++	bch->ecc_bytes = (bch->ecc_bits + 7) / 8;
++	build_mod_tables(bch, bch->g);
++
++	*bch_ret = bch;
++
++	return EXIT_SUCCESS;
++}
++
++void bch_free(bch_t *bch)
++{
++	if (bch) {
++		k_heap_free(&bch_heap, bch->a_pow);
++		k_heap_free(&bch_heap, bch->a_log);
++		k_heap_free(&bch_heap, bch->mod_tab);
++		k_heap_free(&bch_heap, bch->ecc);
++		k_heap_free(&bch_heap, bch->ecc2);
++		k_heap_free(&bch_heap, bch->syn);
++		k_heap_free(&bch_heap, bch->elp);
++		k_heap_free(&bch_heap, bch->buf);
++		k_heap_free(&bch_heap, bch->buf2);
++		k_heap_free(&bch_heap, bch->buf3);
++		k_heap_free(&bch_heap, bch->g);
++		k_free(bch);
++	}
++}
+diff --git a/drivers/flash/bch.h b/drivers/flash/bch.h
+new file mode 100644
+index 00000000000..d6936997e62
+--- /dev/null
++++ b/drivers/flash/bch.h
+@@ -0,0 +1,40 @@
++/*
++ * Copyright (c) 2022-2025 Macronix International Co., Ltd.
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++#ifndef _BCH_H
++#define _BCH_H
++
++#include <stdint.h>
++#define ROUNDUP_DIV(_val, _base) (((_base) - 1 + (_val)) / (_base))
++
++typedef struct _bch {
++	uint8_t le;	/* little endian */
++	uint32_t m;
++	uint32_t n;
++	uint32_t t;
++	uint32_t ecc_bits;
++	uint32_t ecc_words;
++	uint32_t ecc_bytes;
++	uint32_t len;
++	uint32_t size_step;
++	uint32_t *g; /* genpoly */
++	uint16_t *a_pow;
++	uint16_t *a_log;
++	uint32_t *mod_tab;
++	uint32_t *ecc;
++	uint32_t *ecc2;
++	uint32_t *syn;
++	uint32_t *elp;
++	uint32_t *buf;
++	uint32_t *buf2;
++	uint32_t *buf3;
++} bch_t;
++
++int bch_init(int m, int t, uint32_t size_step, bch_t **bch_ret);
++void bch_free(bch_t *bch);
++void bch_encode(bch_t *bch, uint8_t *data, uint8_t *ecc);
++int bch_decode(bch_t *bch, uint8_t *data, uint8_t *ecc);
++
++#endif
+diff --git a/drivers/flash/spi_nand.c b/drivers/flash/spi_nand.c
+new file mode 100644
+index 00000000000..7fb283aadbc
+--- /dev/null
++++ b/drivers/flash/spi_nand.c
+@@ -0,0 +1,1045 @@
++/*
++ * Copyright (c) 2022-2025 Macronix International Co., Ltd.
++ *
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++#define DT_DRV_COMPAT jedec_spi_nand
++
++#include <errno.h>
++#include <zephyr/drivers/flash.h>
++#include <zephyr/drivers/spi.h>
++#include <zephyr/init.h>
++#include <string.h>
++#include <zephyr/logging/log.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include "spi_nand.h"
++#if IS_ENABLED(CONFIG_SPI_NAND_SOFTWARE_ECC)
++#include "bch.h"
++#define SPI_NAND_ECC_SIZE SPI_NAND_ECC_STEP_SIZE
++#endif
++
++LOG_MODULE_REGISTER(spi_nand, CONFIG_FLASH_LOG_LEVEL);
++
++/* Indicates that an access command includes bytes for the address.
++ * If not provided the opcode is not followed by address bytes.
++ */
++#define NAND_ACCESS_ADDRESSED BIT(0)
++
++/* Indicates that addressed access uses a 8-bit address regardless of
++ * spi_nand_data::flag_8bit_addr.
++ */
++#define NAND_ACCESS_8BIT_ADDR BIT(1)
++
++/* Indicates that addressed access uses a 16-bit address regardless of
++ * spi_nand_data::flag_16bit_addr.
++ */
++#define NAND_ACCESS_16BIT_ADDR BIT(2)
++
++/* Indicates that addressed access uses a 24-bit address regardless of
++ * spi_nand_data::flag_32bit_addr.
++ */
++#define NAND_ACCESS_24BIT_ADDR BIT(3)
++
++/* Indicates that addressed access uses a 32-bit address regardless of
++ * spi_nand_data::flag_32bit_addr.
++ */
++#define NAND_ACCESS_32BIT_ADDR BIT(4)
++
++/* Indicates that an access command is performing a write.  If not
++ * provided access is a read.
++ */
++#define NAND_ACCESS_WRITE BIT(5)
++
++#define NAND_ACCESS_DUMMY BIT(6)
++
++#define OP_TYPE_RD	0
++#define OP_TYPE_PGM	1
++#define FLASH_WRITE_SIZE DT_PROP(DT_INST(0, DT_DRV_COMPAT), page_size)
++#define FLASH_SIZE DT_PROP(DT_INST(0, DT_DRV_COMPAT), flash_size)
++
++
++/* Build-time data associated with the device. */
++struct spi_nand_config {
++	/* Devicetree SPI configuration */
++	struct spi_dt_spec spi;
++	uint8_t id[2];
++	uint32_t page_size;
++};
++
++/**
++ * struct spi_nand_data - Structure for defining the SPI NAND access
++ * @sem: The semaphore to access to the flash
++ */
++struct spi_nand_data {
++	struct k_sem sem;
++
++	/* Number of bytes per page */
++	uint16_t page_size;
++
++	/* Number of oob bytes per page */
++	uint8_t oob_size;
++
++	/* Number of pages per block */
++	uint16_t page_num;
++
++	/* Number of bytes per block */
++	uint32_t block_size;
++
++	/* Number of blocks per chip */
++	uint16_t block_num;
++
++	/* Size of flash, in bytes */
++	uint64_t flash_size;
++
++	uint8_t page_shift;
++
++	uint8_t block_shift;
++
++	bool continuous_read;
++
++	uint16_t prg_timeout;
++
++	uint8_t *page_buf;
++	struct nand_ecc_info {
++		uint8_t ecc_bits;
++		uint8_t ecc_bytes;
++		uint8_t ecc_steps;
++		uint8_t ecc_layout_pos;
++		uint32_t ecc_size;
++		uint8_t *ecc_calc;
++		uint8_t *ecc_code;
++	} ecc;
++
++#if IS_ENABLED(CONFIG_SPI_NAND_SOFTWARE_ECC)
++	struct nand_bch_control {
++		bch_t *bch;
++		uint8_t *mask_ff;
++		uint8_t *input_data;
++	} nbc;
++#endif
++};
++
++int fmsb32(uint32_t bits)
++{
++	int n = 32, m = 16;
++	uint32_t x = 0xffffffff;
++
++	if (!bits) {
++		return -1;
++	}
++
++	do {
++		if (!(bits & (x << (32 - m)))) {
++			bits <<= m;
++			n -= m;
++		}
++		m >>= 1;
++	} while(m > 0);
++
++	return n - 1;
++}
++
++/*
++ * @brief Send an SPI command
++ *
++ * @param dev Device struct
++ * @param opcode The command to send
++ * @param access flags that determine how the command is constructed.
++ *        See NAND_ACCESS_*.
++ * @param addr The address to send
++ * @param data The buffer to store or read the value
++ * @param length The size of the buffer
++ * @return 0 on success, negative errno code otherwise
++ */
++static int spi_nand_access(const struct device *const dev,
++			  uint8_t opcode, unsigned int access,
++			  off_t addr, void *data, size_t length)
++{
++	const struct spi_nand_config *const driver_cfg = dev->config;
++	bool is_addressed = (access & NAND_ACCESS_ADDRESSED) != 0U;
++	bool is_write = (access & NAND_ACCESS_WRITE) != 0U;
++	uint8_t buf[5] = { 0 };
++	uint8_t address_len = 0;
++	struct spi_buf spi_buf[2] = {
++		{
++			.buf = buf,
++			.len = 1,
++		},
++		{
++			.buf = data,
++			.len = length
++		}
++	};
++
++	buf[0] = opcode;
++	if (is_addressed) {
++		union {
++			uint32_t u32;
++			uint8_t u8[4];
++		} addr32 = {
++			.u32 = sys_cpu_to_be32(addr),
++		};
++
++		if (access & NAND_ACCESS_32BIT_ADDR) {
++			address_len = 4;
++		} else if (access & NAND_ACCESS_24BIT_ADDR) {
++			address_len = 3;
++		} else if (access & NAND_ACCESS_16BIT_ADDR) {
++			address_len = 2;
++		} else if (access & NAND_ACCESS_8BIT_ADDR) {
++			address_len = 1;
++		}
++		memcpy(&buf[1], &addr32.u8[4 - address_len], address_len);
++		spi_buf[0].len += address_len;
++	};
++
++	if (access & NAND_ACCESS_DUMMY) {
++		spi_buf[0].len += 1;
++	}
++
++	const struct spi_buf_set tx_set = {
++		.buffers = spi_buf,
++		.count = (length != 0) ? 2 : 1,
++	};
++
++	const struct spi_buf_set rx_set = {
++		.buffers = spi_buf,
++		.count = 2,
++	};
++
++	if (is_write) {
++		return spi_write_dt(&driver_cfg->spi, &tx_set);
++	}
++
++	return spi_transceive_dt(&driver_cfg->spi, &tx_set, &rx_set);
++}
++
++#define spi_nand_cmd_read(dev, opcode, dest, length) \
++	spi_nand_access(dev, opcode, 0, 0, dest, length)
++#define spi_nand_cmd_write(dev, opcode) \
++	spi_nand_access(dev, opcode, NAND_ACCESS_WRITE, 0, NULL, 0)
++
++/* Everything necessary to acquire owning access to the device.
++ *
++ * This means taking the lock .
++ */
++static void acquire_device(const struct device *dev)
++{
++	if (IS_ENABLED(CONFIG_MULTITHREADING)) {
++		struct spi_nand_data *const driver_data = dev->data;
++
++		k_sem_take(&driver_data->sem, K_FOREVER);
++	}
++}
++
++/* Everything necessary to release access to the device.
++ *
++ * This means releasing the lock.
++ */
++static void release_device(const struct device *dev)
++{
++	if (IS_ENABLED(CONFIG_MULTITHREADING)) {
++		struct spi_nand_data *const driver_data = dev->data;
++
++		k_sem_give(&driver_data->sem);
++	}
++}
++
++static int spi_nand_get_feature(const struct device *dev,
++				uint8_t feature_addr, uint8_t *val)
++{
++	int ret = spi_nand_access(dev, SPI_NAND_CMD_GET_FEATURE,
++			NAND_ACCESS_ADDRESSED | NAND_ACCESS_8BIT_ADDR,
++			feature_addr, val, sizeof(*val));
++
++	return ret;
++}
++
++static int spi_nand_set_feature(const struct device *dev,
++				uint8_t feature_addr, uint8_t val)
++{
++	int ret = spi_nand_access(dev, SPI_NAND_CMD_SET_FEATURE,
++			NAND_ACCESS_WRITE | NAND_ACCESS_ADDRESSED | NAND_ACCESS_8BIT_ADDR,
++			feature_addr, &val, sizeof(val));
++
++	return ret;
++}
++
++/**
++ * @brief Wait until the flash is ready
++ *
++ * @note The device must be externally acquired before invoking this
++ * function.
++ *
++ * This function should be invoked after every ERASE, PROGRAM, or
++ * WRITE_STATUS operation before continuing.  This allows us to assume
++ * that the device is ready to accept new commands at any other point
++ * in the code.
++ *
++ * @param dev The device structure
++ * @return 0 on success, negative errno code otherwise
++ */
++static int spi_nand_wait_until_ready(const struct device *dev)
++{
++	int ret;
++	uint8_t reg = 0;
++	struct spi_nand_data *data = dev->data;
++
++	int timeout_ms = data->prg_timeout;
++	int64_t start_time = k_uptime_get();
++
++	do {
++		ret = spi_nand_get_feature(dev, SPI_NAND_FEA_ADDR_STATUS, &reg);
++
++		if (ret != 0) {
++			return ret;
++		}
++
++		if (!(reg & SPI_NAND_WIP_BIT) == 0U) {
++			return EXIT_SUCCESS;
++		}
++	} while ((k_uptime_get() - start_time) < timeout_ms);
++
++	LOG_ERR("spi_nand_wait_until_ready: Timeout waiting for flash ready");
++	return -ETIMEDOUT;
++}
++
++#if IS_ENABLED(CONFIG_SPI_NAND_SOFTWARE_ECC)
++static int nand_bch_calc(const struct device *dev, uint8_t *buf_data, uint8_t *buf_ecc)
++{
++	int n;
++	struct spi_nand_data *data = dev->data;
++
++	bch_encode(data->nbc.bch, buf_data, buf_ecc);
++	for (n = 0; n < data->ecc.ecc_bytes; n++) {
++		buf_ecc[n] ^= data->nbc.mask_ff[n];
++	}
++
++	return EXIT_SUCCESS;
++}
++
++static inline void nand_bch_release(const struct device *dev)
++{
++	struct spi_nand_data *data = dev->data;
++
++	bch_free(data->nbc.bch);
++	if (data->nbc.mask_ff) {
++		free(data->nbc.mask_ff);
++		data->nbc.mask_ff = 0;
++	}
++	data->nbc.bch = 0;
++}
++
++static int bch_ecc_init(const struct device *dev, uint8_t ecc_bits)
++{
++	struct spi_nand_data *data = dev->data;
++	uint32_t t, i;
++	uint8_t *erased_page;
++	uint32_t eccbytes = 0;
++	int ret = 0;
++	t = ecc_bits;
++
++	data->ecc.ecc_size = SPI_NAND_ECC_SIZE;
++	uint32_t m = fmsb32(8 * data->ecc.ecc_size) + 1;
++	data->ecc.ecc_steps = data->page_size / data->ecc.ecc_size;
++	data->ecc.ecc_layout_pos = 2; /* skip the bad block mark for Macronix spi nand */
++	data->ecc.ecc_bytes = eccbytes = ROUNDUP_DIV(data->ecc.ecc_bits * m, 8);
++
++	ret = bch_init(m, t, data->ecc.ecc_size, &data->nbc.bch);
++	if (ret) {
++		return -EINVAL;
++	}
++
++	/* verify that eccbytes has the expected value */
++	if (data->nbc.bch->ecc_bytes != eccbytes) {
++		LOG_ERR("invalid eccbytes %d, should be %d\n",
++			eccbytes, data->nbc.bch->ecc_words);
++		return -EINVAL;
++	}
++	data->page_buf = (uint8_t *)k_malloc(data->page_size + data->oob_size);
++	if (data->page_buf == NULL) {
++		LOG_ERR("Not enougn heap\n");
++		nand_bch_release(dev);
++		return -ENOMEM;
++	}
++
++	data->nbc.input_data = (uint8_t *)k_malloc(data->page_size + data->oob_size);
++	if (data->nbc.input_data == NULL) {
++		LOG_ERR("Not enougn heap\n");
++		nand_bch_release(dev);
++		return -ENOMEM;
++	}
++
++	data->ecc.ecc_calc = (uint8_t *)k_malloc(data->ecc.ecc_steps * data->ecc.ecc_bytes);
++	if (data->ecc.ecc_calc == NULL) {
++		LOG_ERR("Not enougn heap\n");
++		nand_bch_release(dev);
++		return -ENOMEM;
++	}
++	data->ecc.ecc_code = (uint8_t *)k_malloc(data->ecc.ecc_steps * data->ecc.ecc_bytes);
++	if (data->ecc.ecc_code == NULL) {
++		LOG_ERR("Not enougn heap\n");
++		nand_bch_release(dev);
++		return -ENOMEM;
++	}
++	data->nbc.mask_ff = (uint8_t *)k_malloc(eccbytes);
++	if (data->nbc.mask_ff == NULL) {
++		LOG_ERR("Not enougn heap\n");
++		nand_bch_release(dev);
++		return -ENOMEM;
++	}
++	/*
++	 * compute and store the inverted ecc of an erased ecc block
++	 */
++	erased_page = (uint8_t *)k_malloc(data->ecc.ecc_size);
++	if (erased_page == NULL) {
++		LOG_ERR("Not enougn heap\n");
++		nand_bch_release(dev);
++		return -ENOMEM;
++	}
++	memset(data->page_buf, 0xff, data->page_size + data->oob_size);
++	memset(erased_page, 0xff, data->ecc.ecc_size);
++	memset(data->nbc.mask_ff, 0, eccbytes);
++	bch_encode(data->nbc.bch, erased_page, (uint8_t *)data->nbc.mask_ff);
++	k_free(erased_page);
++
++	for (i = 0; i < eccbytes; i++) {
++		data->nbc.mask_ff[i] ^= 0xff;
++	}
++
++	return EXIT_SUCCESS;
++}
++
++static int spi_nand_read_software_ecc(const struct device *dev,
++			off_t addr, void *dest, size_t size)
++{
++	struct spi_nand_data *data = dev->data;
++	int ret = 0;
++	uint32_t offset = 0;
++	uint32_t chunk = 0;
++	uint8_t ecc_steps = data->ecc.ecc_steps;
++	uint8_t *p = (uint8_t *)data->page_buf;
++	uint8_t *ecc_code = data->ecc.ecc_code;
++
++	acquire_device(dev);
++	while (size > 0) {
++		/* Read on _page_size_bytes boundaries (Default 2048 bytes a page) */
++		offset = addr % data->page_size;
++		chunk = (offset + size < data->page_size) ?
++			size : (data->page_size - offset);
++
++		ret = spi_nand_access(dev, SPI_NAND_CMD_PAGE_READ,
++			NAND_ACCESS_ADDRESSED | NAND_ACCESS_24BIT_ADDR,
++			addr >> data->page_shift, NULL, 0);
++		if (ret != 0) {
++			LOG_ERR("page read failed: %d", ret);
++			goto out;
++		}
++
++		ret = spi_nand_wait_until_ready(dev);
++		if (ret != 0) {
++			LOG_ERR("wait ready failed: %d", ret);
++			goto out;
++		}
++
++		ret = spi_nand_access(dev, SPI_NAND_CMD_READ_CACHE,
++			NAND_ACCESS_ADDRESSED | NAND_ACCESS_16BIT_ADDR | NAND_ACCESS_DUMMY,
++			(addr & SPI_NAND_PAGE_MASK), data->page_buf,
++			data->page_size + data->oob_size);
++		if (ret != 0) {
++			LOG_ERR("read from cache failed: %d", ret);
++			goto out;
++		}
++		memcpy(data->ecc.ecc_code, data->page_buf + data->page_size +
++			data->ecc.ecc_layout_pos, data->ecc.ecc_bytes * data->ecc.ecc_steps);
++
++		p = (uint8_t *)data->page_buf;
++		ecc_steps = data->ecc.ecc_steps;
++
++		for (uint8_t i = 0 ; ecc_steps > 0; ecc_steps--, i += data->ecc.ecc_bytes,
++			p += data->ecc.ecc_size) {
++
++			memset(data->nbc.input_data, 0x0, (1 << data->nbc.bch->m) / 8);
++			memcpy(data->nbc.input_data, p,	data->ecc.ecc_size);
++
++			int ret = bch_decode(data->nbc.bch, data->nbc.input_data,
++				(uint8_t *)(data->ecc.ecc_code + i));
++
++			if (ret < 0) {
++				LOG_ERR("Reading data failed");
++				goto out;
++			}
++		}
++
++		memcpy(dest, data->page_buf + offset, chunk);
++		dest = (uint8_t *)dest + chunk;
++		addr = (addr + SPI_NAND_PAGE_OFFSET) & (~SPI_NAND_PAGE_MASK);
++		size -= chunk;
++	}
++
++out:
++	release_device(dev);
++	return ret;
++}
++#endif
++
++static int spi_nand_conti_read_enable(const struct device *dev, bool conti)
++{
++	int ret;
++	uint8_t secur_reg = 0;
++
++	acquire_device(dev);
++	ret = spi_nand_get_feature(dev, SPI_NAND_FEA_ADDR_CONF_B0, &secur_reg);
++	if (ret != 0) {
++		LOG_ERR("get feature failed: %d", ret);
++		goto out;
++	}
++	if (conti) {
++		secur_reg |= SPINAND_SECURE_BIT_CONT;
++	} else {
++		secur_reg &= ~SPINAND_SECURE_BIT_CONT;
++	}
++	ret = spi_nand_set_feature(dev, SPI_NAND_FEA_ADDR_CONF_B0, secur_reg);
++	if (ret != 0) {
++		LOG_ERR("set feature failed: %d", ret);
++		goto out;
++	}
++	ret = spi_nand_get_feature(dev, SPI_NAND_FEA_ADDR_CONF_B0, &secur_reg);
++	if (ret != 0) {
++		LOG_ERR("get feature failed: %d", ret);
++		goto out;
++	}
++	if ((secur_reg & SPINAND_SECURE_BIT_CONT) == 0) {
++		LOG_ERR("Enable continuous read failed: %d\n", secur_reg);
++	}
++
++out:
++	release_device(dev);
++	return ret;
++}
++
++static int spi_nand_read_cont(const struct device *dev, off_t addr, void *dest,
++			size_t size)
++{
++	struct spi_nand_data *data = dev->data;
++	int ret = 0;
++
++	acquire_device(dev);
++	ret = spi_nand_access(dev, SPI_NAND_CMD_PAGE_READ,
++		NAND_ACCESS_ADDRESSED | NAND_ACCESS_24BIT_ADDR,
++		addr >> data->page_shift, NULL, 0);
++	if (ret != 0) {
++		LOG_ERR("page read failed: %d", ret);
++		goto out;
++	}
++
++	ret = spi_nand_wait_until_ready(dev);
++	if (ret != 0) {
++		LOG_ERR("wait ready failed: %d", ret);
++		goto out;
++	}
++
++	ret = spi_nand_access(dev, SPI_NAND_CMD_READ_CACHE,
++		NAND_ACCESS_ADDRESSED | NAND_ACCESS_24BIT_ADDR,
++		((addr >> data->page_shift) & SPI_NAND_PAGE_MASK), dest, size);
++	if (ret != 0) {
++		LOG_ERR("read from cache failed: %d", ret);
++		goto out;
++	}
++
++	ret = spi_nand_conti_read_enable(dev, false);
++
++out:
++	release_device(dev);
++
++	return ret;
++}
++
++static int spi_nand_read_normal(const struct device *dev,
++				off_t addr, void *dest, size_t size)
++{
++	struct spi_nand_data *data = dev->data;
++	int ret = 0;
++	uint32_t offset = 0;
++	uint32_t chunk = 0;
++
++	acquire_device(dev);
++	while (size > 0) {
++		/* Read on _page_size_bytes boundaries (Default 2048 bytes a page) */
++		offset = addr % data->page_size;
++		chunk = (offset + size < data->page_size) ?
++			size : (data->page_size - offset);
++		ret = spi_nand_access(dev, SPI_NAND_CMD_PAGE_READ,
++			NAND_ACCESS_ADDRESSED | NAND_ACCESS_24BIT_ADDR,
++			addr >> data->page_shift, NULL, 0);
++		if (ret != 0) {
++			LOG_ERR("page read failed: %d", ret);
++			goto out;
++		}
++
++		ret = spi_nand_wait_until_ready(dev);
++		if (ret != 0) {
++			LOG_ERR("wait ready failed: %d", ret);
++			goto out;
++		}
++
++		ret = spi_nand_access(dev, SPI_NAND_CMD_READ_CACHE,
++			NAND_ACCESS_ADDRESSED | NAND_ACCESS_16BIT_ADDR | NAND_ACCESS_DUMMY,
++			(addr & SPI_NAND_PAGE_MASK), dest, chunk);
++		if (ret != 0) {
++			LOG_ERR("read from cache failed: %d", ret);
++			goto out;
++		}
++
++		dest = (uint8_t *)dest + chunk;
++
++		addr = (addr + SPI_NAND_PAGE_OFFSET) & (~SPI_NAND_PAGE_MASK);
++		size -= chunk;
++	}
++
++out:
++	release_device(dev);
++
++	return ret;
++}
++
++
++static int spi_nand_read(const struct device *dev, off_t addr, void *dest,
++			size_t size)
++{
++	int ret = 0;
++	struct spi_nand_data *data = dev->data;
++	/* should be between 0 and flash size */
++	if ((addr < 0) || ((addr + size) > data->flash_size)) {
++		return -EINVAL;
++	}
++	if (data->ecc.ecc_bits == 0) {
++		if (data->continuous_read) {
++			ret = spi_nand_read_cont(dev, addr, dest, size);
++		} else {
++			ret = spi_nand_read_normal(dev, addr, dest, size);
++		}
++	} else {
++#if IS_ENABLED(CONFIG_SPI_NAND_SOFTWARE_ECC)
++		ret = spi_nand_read_software_ecc(dev, addr, dest, size);
++#else
++		return -ENOTSUP;
++#endif
++	}
++	return ret;
++}
++
++static int spi_nand_write(const struct device *dev, off_t addr,
++			 const void *src,
++			 size_t size)
++{
++	struct spi_nand_data *data = dev->data;
++	const size_t flash_size = data->flash_size;
++	int ret = 0;
++	uint32_t offset = 0;
++	uint32_t chunk = 0;
++	uint32_t written_bytes = 0;
++
++	/* should be between 0 and flash size */
++	if ((addr < 0) || ((addr + size) > flash_size)) {
++		return -EINVAL;
++	}
++
++	/* size must be a multiple of page */
++	if ((size % data->page_size) != 0) {
++		return -EINVAL;
++	}
++
++	acquire_device(dev);
++
++	while (size > 0) {
++		/* Don't write more than a page. */
++		offset = addr % data->page_size;
++		chunk = data->page_size - offset;
++		written_bytes = chunk;
++
++		spi_nand_cmd_write(dev, SPI_NAND_CMD_WREN);
++		if (data->ecc.ecc_bits == 0) {
++			ret = spi_nand_access(dev, SPI_NAND_CMD_PP_LOAD,
++				NAND_ACCESS_WRITE | NAND_ACCESS_ADDRESSED | NAND_ACCESS_16BIT_ADDR,
++				(addr & SPI_NAND_PAGE_MASK), (void *)src, written_bytes);
++			if (ret != 0) {
++				LOG_ERR("program load failed: %d", ret);
++				goto out;
++			}
++		} else {
++#if IS_ENABLED(CONFIG_SPI_NAND_SOFTWARE_ECC)
++			uint8_t *p = (uint8_t *)data->page_buf;
++			uint8_t ecc_steps = data->ecc.ecc_steps;
++
++			/* prepare data */
++			memset(data->page_buf, 0xff, data->page_size + data->oob_size);
++			memcpy(data->page_buf + offset, (uint8_t *)src, written_bytes);
++
++			/* calculate the software ECC */
++			for (uint8_t i = 0; ecc_steps; ecc_steps--, i += data->ecc.ecc_bytes,
++				p += data->ecc.ecc_size) {
++				memset(data->nbc.input_data, 0x0, (1 << data->nbc.bch->m) / 8);
++				memcpy(data->nbc.input_data , p, data->ecc.ecc_size);
++
++				nand_bch_calc(dev, data->nbc.input_data,
++						data->ecc.ecc_calc + i);
++			}
++
++			/* prepare ECC code */
++			memcpy(data->page_buf + data->page_size + data->ecc.ecc_layout_pos,
++				data->ecc.ecc_calc, data->ecc.ecc_bytes * data->ecc.ecc_steps);
++
++			written_bytes = data->page_size + data->oob_size;
++			ret = spi_nand_access(dev, SPI_NAND_CMD_PP_LOAD,
++				NAND_ACCESS_WRITE | NAND_ACCESS_ADDRESSED | NAND_ACCESS_16BIT_ADDR,
++				(addr & SPI_NAND_PAGE_MASK), (void *)data->page_buf, written_bytes);
++			if (ret != 0) {
++				LOG_ERR("program load failed: %d", ret);
++				goto out;
++			}
++#else
++			ret = -ENOTSUP;
++			goto out;
++#endif
++		}
++
++		ret = spi_nand_access(dev, SPI_NAND_CMD_PROGRAM_EXEC,
++			NAND_ACCESS_WRITE | NAND_ACCESS_ADDRESSED | NAND_ACCESS_24BIT_ADDR,
++			addr >> data->page_shift, NULL, 0);
++		if (ret != 0) {
++			LOG_ERR("program excute failed: %d", ret);
++			goto out;
++		}
++
++		src = (const uint8_t *)(src) + chunk;
++		addr = (addr + SPI_NAND_PAGE_OFFSET) & (~SPI_NAND_PAGE_MASK);
++		size -= chunk;
++
++		ret = spi_nand_wait_until_ready(dev);
++		if (ret != 0) {
++			LOG_ERR("wait ready failed: %d", ret);
++			goto out;
++		}
++	}
++
++out:
++	release_device(dev);
++	return ret;
++}
++
++static int spi_nand_erase(const struct device *dev, off_t addr, size_t size)
++{
++	struct spi_nand_data *data = dev->data;
++	int ret = 0;
++	/* erase area must be subregion of device */
++	if ((addr < 0) || ((size + addr) > data->flash_size)) {
++		return -EINVAL;
++	}
++	/* address must be block-aligned */
++	if ((addr % data->block_size) != 0) {
++		return -EINVAL;
++	}
++	/* size must be a multiple of blocks */
++	if ((size % data->block_size) != 0) {
++		return -EINVAL;
++	}
++
++	acquire_device(dev);
++	while ((size > 0) && (ret == 0)) {
++		spi_nand_cmd_write(dev, SPI_NAND_CMD_WREN);
++
++		ret = spi_nand_access(dev, SPI_NAND_CMD_BE,
++			NAND_ACCESS_ADDRESSED | NAND_ACCESS_24BIT_ADDR,
++			addr >> data->page_shift, NULL, 0);
++		if (ret != 0) {
++			LOG_ERR("erase failed: %d", ret);
++			goto out;
++		}
++
++		addr += SPI_NAND_BLOCK_OFFSET;
++		size -= data->block_size;
++
++		ret = spi_nand_wait_until_ready(dev);
++		if (ret != 0) {
++			LOG_ERR("wait ready failed: %d", ret);
++			goto out;
++		}
++
++	}
++
++out:
++	release_device(dev);
++	return ret;
++}
++
++static int spi_nand_check_id(const struct device *dev)
++{
++	const struct spi_nand_config *cfg = dev->config;
++	uint8_t const *expected_id = cfg->id;
++	uint8_t read_id[SPI_NAND_ID_LEN];
++
++	if (read_id == NULL) {
++		return -EINVAL;
++	}
++
++	acquire_device(dev);
++	int ret = spi_nand_access(dev, SPI_NAND_CMD_RDID, NAND_ACCESS_DUMMY,
++			0, read_id, SPI_NAND_ID_LEN);
++	release_device(dev);
++	if (memcmp(expected_id, read_id, sizeof(read_id)) != 0) {
++		LOG_ERR("Wrong ID: %02X %02X , "
++			"expected: %02X %02X ",
++			read_id[0], read_id[1],
++			expected_id[0], expected_id[1]);
++		return -ENODEV;
++	}
++
++	return ret;
++}
++
++static int spi_nand_read_otp_onfi(const struct device *dev)
++{
++	int ret;
++	uint8_t secur_reg = 0, onfi_table[256];
++	struct spi_nand_data *data = dev->data;
++	data->page_size = FLASH_WRITE_SIZE;
++	data->flash_size = FLASH_SIZE;
++
++	switch (data->page_size) {
++	case 2048:
++		data->page_shift = 12;
++	break;
++	case 4096:
++		data->page_shift = 13;
++	break;
++	default:
++		return -EINVAL;
++	}
++
++	acquire_device(dev);
++	ret = spi_nand_get_feature(dev, SPI_NAND_FEA_ADDR_CONF_B0, &secur_reg);
++	if (ret != 0) {
++		LOG_ERR("get feature failed: %d", ret);
++		goto out0;
++	}
++	secur_reg |= SPINAND_SECURE_BIT_OTP_EN;
++	ret = spi_nand_set_feature(dev, SPI_NAND_FEA_ADDR_CONF_B0, secur_reg);
++	if (ret != 0) {
++		LOG_ERR("set feature failed: %d", ret);
++		goto out0;
++	}
++	ret = spi_nand_get_feature(dev, SPI_NAND_FEA_ADDR_CONF_B0, &secur_reg);
++	if (ret != 0) {
++		LOG_ERR("get feature failed: %d", ret);
++		goto out0;
++	}
++	if ((secur_reg & SPINAND_SECURE_BIT_OTP_EN) == 0) {
++		LOG_ERR("Enable OTP failed: %d\n", secur_reg);
++		ret = -EINVAL;
++	}
++out0:
++	release_device(dev);
++	if (ret != 0) {
++		return ret;
++	}
++	ret = spi_nand_read(dev, 1 << data->page_shift, onfi_table, sizeof(onfi_table));
++	if (ret != 0) {
++		LOG_ERR("read onfi table failed: %d", ret);
++		return ret;
++	}
++	if (onfi_table[ONFI_SIG_0] == 'O' && onfi_table[ONFI_SIG_1] == 'N'
++		&& onfi_table[ONFI_SIG_2] == 'F' && onfi_table[ONFI_SIG_3] == 'I') {
++		LOG_ERR("ONFI table found\n");
++		data->page_size = onfi_table[ONFI_PAGE_SIZE_80] + (onfi_table[ONFI_PAGE_SIZE_81] << 8)
++			+ (onfi_table[ONFI_PAGE_SIZE_82] << 16);
++		data->oob_size = onfi_table[ONFI_OOB_SIZE_84] + (onfi_table[ONFI_OOB_SIZE_85] << 8);
++		data->page_num = onfi_table[ONFI_PAGE_NUM_92] + (onfi_table[ONFI_PAGE_NUM_93] << 8);
++		data->block_num = onfi_table[ONFI_BLK_NUM_96] + (onfi_table[ONFI_BLK_NUM_97] << 8);
++		data->prg_timeout = onfi_table[ONFI_BE_TIME_135] + (onfi_table[ONFI_BE_TIME_136] << 8);
++		data->block_size = data->page_size * data->page_num;
++
++		switch (data->page_num) {
++		case 64:
++			data->block_shift = data->page_shift + 6;
++		break;
++		case 128:
++			data->block_shift = data->page_shift + 7;
++		break;
++		case 256:
++			data->block_shift = data->page_shift + 8;
++		break;
++		}
++		data->ecc.ecc_bits = onfi_table[ONFI_ECC_NUM_112];
++
++		if (data->ecc.ecc_bits > 0 && IS_ENABLED(CONFIG_SPI_NAND_SOFTWARE_ECC)) {
++#if IS_ENABLED(CONFIG_SPI_NAND_SOFTWARE_ECC)
++			ret = bch_ecc_init(dev, data->ecc.ecc_bits);
++			if (ret != 0) {
++				LOG_ERR("bch init failed: %d", ret);
++				goto out1;
++			}
++#endif
++		} else {
++			acquire_device(dev);
++			secur_reg |= SPINAND_SECURE_BIT_ECC_EN;
++			ret = spi_nand_set_feature(dev,
++				SPI_NAND_FEA_ADDR_CONF_B0, secur_reg);
++			if (ret != 0) {
++				LOG_ERR("set feature failed: %d", ret);
++				goto out1;
++			}
++			release_device(dev);
++		}
++
++		if ((onfi_table[ONFI_CONT_READ_168] & 0x02) != 0) {
++			data->continuous_read = true;
++			ret = spi_nand_conti_read_enable(dev, true);
++			if (ret != 0) {
++				LOG_ERR("SPI NAND Set continuous read enable Failed: %d", ret);
++				return ret;
++			}
++		} else {
++			data->continuous_read = false;
++		}
++	} else {
++		LOG_ERR("ONFI table not found");
++		return EXIT_SUCCESS;
++	}
++
++	acquire_device(dev);
++	ret = spi_nand_get_feature(dev, SPI_NAND_FEA_ADDR_CONF_B0, &secur_reg);
++	if (ret != 0) {
++		LOG_ERR("get feature failed: %d", ret);
++		goto out1;
++	}
++
++	secur_reg &= ~SPINAND_SECURE_BIT_OTP_EN;
++	ret = spi_nand_set_feature(dev, SPI_NAND_FEA_ADDR_CONF_B0, secur_reg);
++	if (ret != 0) {
++		LOG_ERR("set feature failed: %d", ret);
++		goto out1;
++	}
++
++	ret = spi_nand_get_feature(dev, SPI_NAND_FEA_ADDR_CONF_B0, &secur_reg);
++	if (ret != 0) {
++		LOG_ERR("get feature failed: %d", ret);
++		goto out1;
++	}
++
++	if ((secur_reg & SPINAND_SECURE_BIT_OTP_EN) != 0) {
++		LOG_ERR("Disable OTP failed: %d\n", secur_reg);
++		ret = -EINVAL;
++	}
++
++out1:
++	release_device(dev);
++	return ret;
++}
++
++/**
++ * @brief Configure the flash
++ *
++ * @param dev The flash device structure
++ * @param info The flash info structure
++ * @return 0 on success, negative errno code otherwise
++ */
++static int spi_nand_configure(const struct device *dev)
++{
++	const struct spi_nand_config *cfg = dev->config;
++
++	uint8_t reg = 0;
++	int ret;
++	/* Validate bus and CS is ready */
++	if (!spi_is_ready_dt(&cfg->spi)) {
++		return -ENODEV;
++	}
++	ret = spi_nand_check_id(dev);
++	if (ret != 0) {
++		LOG_ERR("Check ID failed: ");
++		return -ENODEV;
++	}
++	/* Check for block protect bits that need to be cleared. */
++	acquire_device(dev);
++	ret = spi_nand_get_feature(dev, SPI_NAND_FEA_ADDR_BLOCK_PROT, &reg);
++
++	if (ret != 0) {
++		LOG_ERR("get feature failed: %d", ret);
++		goto out;
++	}
++	/* Only clear if GET_FEATURE worked and something's set. */
++	if ((reg & SPINAND_BLOCK_PROT_BIT_BP_MASK) != 0) {
++		reg = 0;
++		ret = spi_nand_set_feature(dev, SPI_NAND_FEA_ADDR_BLOCK_PROT, reg);
++		if (ret != 0) {
++			LOG_ERR("set feature failed: %d", ret);
++		}
++	}
++out:
++	release_device(dev);
++
++	if (ret != 0) {
++		return ret;
++	}
++	ret = spi_nand_read_otp_onfi(dev);
++	if (ret != 0) {
++		LOG_ERR("SFDP read failed: %d", ret);
++		return -ENODEV;
++	}
++
++	return EXIT_SUCCESS;
++}
++
++/**
++ * @brief Initialize and configure the flash
++ *
++ * @param name The flash name
++ * @return 0 on success, negative errno code otherwise
++ */
++static int spi_nand_init(const struct device *dev)
++{
++	if (IS_ENABLED(CONFIG_MULTITHREADING)) {
++		struct spi_nand_data *const driver_data = dev->data;
++
++		k_sem_init(&driver_data->sem, 1, K_SEM_MAX_LIMIT);
++	}
++
++	return spi_nand_configure(dev);
++}
++
++static const struct flash_parameters flash_nand_parameters = {
++	.write_block_size = FLASH_WRITE_SIZE,
++	.erase_value = 0xff,
++};
++
++static const struct flash_parameters *
++flash_nand_get_parameters(const struct device *dev)
++{
++	ARG_UNUSED(dev);
++
++	return &flash_nand_parameters;
++}
++
++static DEVICE_API(flash, spi_nand_api) = {
++	.read = spi_nand_read,
++	.write = spi_nand_write,
++	.erase = spi_nand_erase,
++	.get_parameters = flash_nand_get_parameters,
++};
++
++#define GENERATE_CONFIG_STRUCT(idx)								\
++	static const struct spi_nand_config spi_nand_##idx##_config = {				\
++		.spi = SPI_DT_SPEC_INST_GET(idx, SPI_WORD_SET(8), CONFIG_SPI_NOR_CS_WAIT_DELAY), \
++		.id = DT_INST_PROP(idx, id), \
++		.page_size = DT_INST_PROP(idx, page_size)};
++
++#define SPI_NAND_INST(idx)							\
++	GENERATE_CONFIG_STRUCT(idx)						\
++	static struct spi_nand_data spi_nand_##idx##_data;			\
++	DEVICE_DT_INST_DEFINE(idx, &spi_nand_init, NULL,	\
++			&spi_nand_##idx##_data, &spi_nand_##idx##_config,		\
++			POST_KERNEL, CONFIG_SPI_NAND_INIT_PRIORITY, &spi_nand_api);
++
++DT_INST_FOREACH_STATUS_OKAY(SPI_NAND_INST)
+diff --git a/drivers/flash/spi_nand.h b/drivers/flash/spi_nand.h
+new file mode 100644
+index 00000000000..f9954748de1
+--- /dev/null
++++ b/drivers/flash/spi_nand.h
+@@ -0,0 +1,71 @@
++/*
++ * Copyright (c) 2022-2025 Macronix International Co., Ltd.
++ *
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++#ifndef __SPI_NAND_H__
++#define __SPI_NAND_H__
++
++#include <zephyr/sys/util.h>
++#include <zephyr/sys/byteorder.h>
++
++#define SPI_NAND_ID_LEN	2
++
++/* Status register bits */
++#define SPI_NAND_WIP_BIT         BIT(0)  /* Write in progress */
++
++/* Get/Set Feature Address Definition */
++#define SPI_NAND_FEA_ADDR_BLOCK_PROT 0xA0
++#define SPI_NAND_FEA_ADDR_CONF_B0    0xB0
++#define SPI_NAND_FEA_ADDR_STATUS     0xC0
++#define SPI_NAND_FEA_ADDR_RECOVERY   0x70
++
++/* Secure OTP Register Bits  0xB0 */
++#define SPINAND_SECURE_BIT_CONT        0x04  /* continuous read enable */
++#define SPINAND_SECURE_BIT_ECC_EN      0x10  /* On-die ECC enable */
++#define SPINAND_SECURE_BIT_OTP_EN      0x40
++
++/* Block Protection Register Bits 0xA0*/
++#define  SPINAND_BLOCK_PROT_BIT_BP_MASK 0x38
++
++/* Flash opcodes */
++#define SPI_NAND_CMD_RDID            0x9F    /* Read ID */
++
++#define SPI_NAND_CMD_PAGE_READ       0x13   /* Read data from array to cache */
++#define SPI_NAND_CMD_READ_CACHE      0x03   /* Read data from cache*/
++
++#define SPI_NAND_CMD_WREN            0x06    /* Write enable */
++#define SPI_NAND_CMD_PP_LOAD         0x02    /* Load data to cache*/
++#define SPI_NAND_CMD_PROGRAM_EXEC    0x10    /* Execute program */
++#define SPI_NAND_CMD_BE              0xD8    /* Block erase */
++
++#define SPI_NAND_CMD_GET_FEATURE     0x0F
++#define SPI_NAND_CMD_SET_FEATURE     0x1F
++#define SPI_NAND_CMD_RESET           0xFF
++#define SPI_NAND_CMD_ECC_STAT_READ   0x7C
++
++#define SPI_NAND_BLOCK_OFFSET  0x40000
++#define SPI_NAND_PAGE_OFFSET   0x1000
++#define SPI_NAND_BLOCK_MASK    0x3FFFF
++#define SPI_NAND_PAGE_MASK     0xFFF
++
++#define ONFI_SIG_0 0
++#define ONFI_SIG_1 1
++#define ONFI_SIG_2 2
++#define ONFI_SIG_3 3
++#define ONFI_PAGE_SIZE_80  80
++#define ONFI_PAGE_SIZE_81  81
++#define ONFI_PAGE_SIZE_82  82
++#define ONFI_OOB_SIZE_84   84
++#define ONFI_OOB_SIZE_85   85
++#define ONFI_PAGE_NUM_92   92
++#define ONFI_PAGE_NUM_93   93
++#define ONFI_BLK_NUM_96    96
++#define ONFI_BLK_NUM_97    97
++#define ONFI_ECC_NUM_112   112
++#define ONFI_BE_TIME_135   135
++#define ONFI_BE_TIME_136   136
++#define ONFI_CONT_READ_168 168
++
++#endif /*__SPI_NAND_H__*/
+diff --git a/dts/bindings/mtd/jedec,spi-nand.yaml b/dts/bindings/mtd/jedec,spi-nand.yaml
+new file mode 100644
+index 00000000000..cc63dc16794
+--- /dev/null
++++ b/dts/bindings/mtd/jedec,spi-nand.yaml
+@@ -0,0 +1,45 @@
++# Copyright (c) 2022-2025 Macronix International Co., Ltd.
++# SPDX-License-Identifier: Apache-2.0
++
++description: |
++    Representation of a serial nand flash on a spi bus:
++
++    mx31lf1ge4bc: spi_nand_flash@0 {
++      compatible = "jedec,spi-nand";
++      reg = <0>;
++      spi-max-frequency = <500000>;
++      id = [c2 1E];
++      cs-wait-delay = <0>;
++      page-size = <2048>;
++      status = "okay";
++    };
++
++compatible: "jedec,spi-nand"
++
++include: "spi-device.yaml"
++
++on-bus: spi
++
++properties:
++  reg:
++    required: true
++  id:
++    required: true
++    type: uint8-array
++    description: |
++      JEDEC ID as manufacturer ID, memory type, memory density.
++  cs-wait-delay:
++    type: int
++    description: |
++      Delay (in microseconds) after Chip Select (CS) signal toggling.
++  page-size:
++    required: true
++    type: int
++    description: |
++      Size (in bytes) of the smallest programmable unit in the storage device.
++      Write operations must align to this size.
++  flash-size:
++    required: true
++    type: int
++    description: |
++      Size (in bytes) of the Flash memory.
+diff --git a/samples/drivers/spi_nand/CMakeLists.txt b/samples/drivers/spi_nand/CMakeLists.txt
+new file mode 100644
+index 00000000000..69534da7e32
+--- /dev/null
++++ b/samples/drivers/spi_nand/CMakeLists.txt
+@@ -0,0 +1,8 @@
++# SPDX-License-Identifier: Apache-2.0
++
++cmake_minimum_required(VERSION 3.13.1)
++find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
++project(spi_nand)
++
++FILE(GLOB app_sources src/*.c)
++target_sources(app PRIVATE ${app_sources})
+diff --git a/samples/drivers/spi_nand/README.rst b/samples/drivers/spi_nand/README.rst
+new file mode 100644
+index 00000000000..afcae84fbc6
+--- /dev/null
++++ b/samples/drivers/spi_nand/README.rst
+@@ -0,0 +1,43 @@
++.. zephyr:code-sample:: spi-nand
++   :name: JEDEC SPI-NAND flash
++   :relevant-api: flash_interface
++
++   Use the flash API to interact with an SPI NAND serial flash memory device.
++
++Overview
++********
++
++This sample demonstrates using the flash API on a SPI NAND serial flash
++memory device.  While trivial it is an example of direct access and
++allows confirmation that the flash is working.
++
++Building and Running
++********************
++
++The application will build only for a target that has a devicetree node with
++one of the following bindings as a compatible:
++
++* :dtcompatible:`jedec,spi-nand`.
++
++.. zephyr-app-commands::
++   :zephyr-app: samples/drivers/spi_nand
++   :board: stm32l562e_dk
++   :goals: build flash
++   :compact:
++
++Sample Output
++=============
++
++.. code-block:: console
++
++   *** Booting Zephyr OS build zephyr-v2.3.0-2142-gca01d2e1d748  ***
++
++   JEDEC QSPI-NAND SPI flash testing
++   ==========================
++
++   Test 1: Flash erase
++   Flash erase succeeded!
++
++   Test 2: Flash write
++   Attempting to write 4 bytes
++   Data read matches data written. Good!
+diff --git a/samples/drivers/spi_nand/boards/stm32l562e_dk.conf b/samples/drivers/spi_nand/boards/stm32l562e_dk.conf
+new file mode 100644
+index 00000000000..c503fcc098b
+--- /dev/null
++++ b/samples/drivers/spi_nand/boards/stm32l562e_dk.conf
+@@ -0,0 +1,11 @@
++#
++# Copyright (c) 2022-2025 Macronix International Co., Ltd.
++#
++# SPDX-License-Identifier: Apache-2.0
++#
++
++CONFIG_SPI=y
++CONFIG_SPI_NAND=y
++CONFIG_SPI_ASYNC=y
++CONFIG_SPI_LOG_LEVEL_INF=y
++CONFIG_SPI_STM32_DMA=y
+diff --git a/samples/drivers/spi_nand/boards/stm32l562e_dk.overlay b/samples/drivers/spi_nand/boards/stm32l562e_dk.overlay
+new file mode 100755
+index 00000000000..708531fe77d
+--- /dev/null
++++ b/samples/drivers/spi_nand/boards/stm32l562e_dk.overlay
+@@ -0,0 +1,22 @@
++/*
++ * Copyright (c) 2022-2025 Macronix International Co., Ltd.
++ *
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++&spi3 {
++	pinctrl-0 = <&spi3_sck_pg9 &spi3_mosi_pb5 &spi3_miso_pb4>;
++	cs-gpios = <&gpioe 0 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>;
++	status = "okay";
++
++	mx31lf1ge4bc: spi_nand_flash@0 {
++		compatible = "jedec,spi-nand";
++		reg = <0>;
++		spi-max-frequency = <500000>;
++		id = [c2 14];
++		cs-wait-delay = <0>;
++		flash-size = <134217728>;
++		page-size = <2048>;
++		status = "okay";
++	};
++};
+diff --git a/samples/drivers/spi_nand/prj.conf b/samples/drivers/spi_nand/prj.conf
+new file mode 100644
+index 00000000000..34b8de131ad
+--- /dev/null
++++ b/samples/drivers/spi_nand/prj.conf
+@@ -0,0 +1,3 @@
++CONFIG_STDOUT_CONSOLE=y
++CONFIG_FLASH=y
++CONFIG_HEAP_MEM_POOL_SIZE=100000
+diff --git a/samples/drivers/spi_nand/sample.yaml b/samples/drivers/spi_nand/sample.yaml
+new file mode 100644
+index 00000000000..dc34582e417
+--- /dev/null
++++ b/samples/drivers/spi_nand/sample.yaml
+@@ -0,0 +1,17 @@
++sample:
++  name: SPI NAND Flash Sample
++tests:
++  sample.drivers.spi.nand.flash:
++    tags: spi nand
++    filter: dt_compat_enabled("jedec,spi-nand")
++    harness: console
++    harness_config:
++      type: multi_line
++      ordered: true
++      regex:
++        - "Test 1: Flash erase"
++        - "Flash erase succeeded!"
++        - "Test 2: Flash write"
++        - "Attempting to write 4 bytes"
++        - "Data read matches data written. Good!!"
++    depends_on: spi
+diff --git a/samples/drivers/spi_nand/src/main.c b/samples/drivers/spi_nand/src/main.c
+new file mode 100644
+index 00000000000..b9603748e5a
+--- /dev/null
++++ b/samples/drivers/spi_nand/src/main.c
+@@ -0,0 +1,212 @@
++/*
++ * Copyright (c) 2022-2025 Macronix International Co., Ltd.
++ *
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++#include <zephyr/kernel.h>
++#include <zephyr/drivers/flash.h>
++#include <zephyr/device.h>
++#include <zephyr/devicetree.h>
++#include <stdio.h>
++#include <string.h>
++
++#define SPI_NAND_TEST_REGION_OFFSET 0x40000
++#define SPI_NAND_BLOCK_SIZE         0x20000U
++#define SPI_NAND_PAGE_SIZE          0x800
++
++#if defined(CONFIG_FLASH_STM32_OSPI) || defined(CONFIG_FLASH_STM32_QSPI) ||                        \
++	defined(CONFIG_FLASH_STM32_XSPI)
++#define SPI_NAND_MULTI_SECTOR_TEST
++#endif
++
++#if DT_HAS_COMPAT_STATUS_OKAY(jedec_spi_nand)
++#define SPI_NAND_COMPAT jedec_spi_nand
++#else
++#define SPI_NAND_COMPAT invalid
++#endif
++
++void single_sector_test(const struct device *flash_dev)
++{
++	const size_t len = SPI_NAND_PAGE_SIZE;
++	uint8_t buf[SPI_NAND_PAGE_SIZE];
++	int rc;
++	uint8_t *buf_wr = (uint8_t * )malloc (SPI_NAND_PAGE_SIZE);
++	uint8_t *erased = (uint8_t * )malloc (SPI_NAND_PAGE_SIZE);
++
++	memset (erased, 0xff, SPI_NAND_PAGE_SIZE);
++	for (int n = 0; n < SPI_NAND_PAGE_SIZE; n++) {
++		buf_wr[n] = rand() % 0x100;
++	}
++
++	printf("\nPerform test on single sector");
++	/* Write protection needs to be disabled before each write or
++	 * erase, since the flash component turns on write protection
++	 * automatically after completion of write and erase
++	 * operations.
++	 */
++	printf("\nTest 1: Flash erase\n");
++
++	/* Full flash erase if SPI_NAND_TEST_REGION_OFFSET = 0 and
++	 * SPI_NAND_BLOCK_SIZE = flash size
++	 */
++	rc = flash_erase(flash_dev, SPI_NAND_TEST_REGION_OFFSET, SPI_NAND_BLOCK_SIZE);
++	if (rc != 0) {
++		printf("Flash erase failed! %d\n", rc);
++	} else {
++		/* Check erased pattern */
++		memset(buf, 0, len);
++		rc = flash_read(flash_dev, SPI_NAND_TEST_REGION_OFFSET, buf, len);
++		if (rc != 0) {
++			printf("Flash read failed! %d\n", rc);
++			return;
++		}
++		if (memcmp(erased, buf, len) != 0) {
++			printf("Flash erase failed at offset 0x%x got 0x%x\n",
++			       SPI_NAND_TEST_REGION_OFFSET, *(uint32_t *)buf);
++			return;
++		}
++		printf("Flash erase succeeded!\n");
++	}
++	printf("\nTest 2: Flash write\n");
++
++	printf("Attempting to write %zu bytes\n", len);
++	rc = flash_write(flash_dev, SPI_NAND_TEST_REGION_OFFSET, buf_wr, len);
++	if (rc != 0) {
++		printf("Flash write failed! %d\n", rc);
++		return;
++	}
++
++	memset(buf, 0, len);
++	rc = flash_read(flash_dev, SPI_NAND_TEST_REGION_OFFSET, buf, len);
++	if (rc != 0) {
++		printf("Flash read failed! %d\n", rc);
++		return;
++	}
++
++	if (memcmp(buf_wr, buf, len) == 0) {
++		printf("Data read matches data written. Good!!\n");
++	} else {
++		const uint8_t *wp = buf_wr;
++		const uint8_t *rp = buf;
++		const uint8_t *rpe = rp + len;
++
++		printf("Data read does not match data written!!\n");
++		while (rp < rpe) {
++			printf("%08x wrote %02x read %02x %s\n",
++			       (uint32_t)(SPI_NAND_TEST_REGION_OFFSET + (rp - buf)), *wp, *rp,
++			       (*rp == *wp) ? "match" : "MISMATCH");
++			++rp;
++			++wp;
++		}
++	}
++}
++
++#if defined SPI_NAND_MULTI_SECTOR_TEST
++void multi_sector_test(const struct device *flash_dev)
++{
++	const size_t len = sizeof(SPI_NAND_PAGE_SIZE);
++	uint8_t buf[SPI_NAND_PAGE_SIZE];
++	int rc;
++	uint8_t *buf_wr = (uint8_t * )malloc (SPI_NAND_PAGE_SIZE);
++	uint8_t *erased = (uint8_t * )malloc (SPI_NAND_PAGE_SIZE);
++
++	memset (erased, 0xff, SPI_NAND_PAGE_SIZE);
++	for (int n = 0; n < SPI_NAND_PAGE_SIZE; n++) {
++		buf_wr[n] = rand() % 0x100;
++	}
++	printf("\nPerform test on multiple consecutive sectors");
++
++	/* Write protection needs to be disabled before each write or
++	 * erase, since the flash component turns on write protection
++	 * automatically after completion of write and erase
++	 * operations.
++	 */
++	printf("\nTest 1: Flash erase\n");
++
++	/* Full flash erase if SPI_NAND_TEST_REGION_OFFSET = 0 and
++	 * SPI_NAND_BLOCK_SIZE = flash size
++	 * Erase 2 sectors for check for erase of consequtive sectors
++	 */
++	rc = flash_erase(flash_dev, SPI_NAND_TEST_REGION_OFFSET, SPI_NAND_BLOCK_SIZE * 2);
++	if (rc != 0) {
++		printf("Flash erase failed! %d\n", rc);
++	} else {
++		/* Read the content and check for erased */
++		memset(buf, 0, len);
++		size_t offs = SPI_NAND_TEST_REGION_OFFSET;
++
++		while (offs < SPI_NAND_TEST_REGION_OFFSET + 2 * SPI_NAND_BLOCK_SIZE) {
++			rc = flash_read(flash_dev, offs, buf, len);
++			if (rc != 0) {
++				printf("Flash read failed! %d\n", rc);
++				return;
++			}
++			if (memcmp(erased, buf, len) != 0) {
++				printf("Flash erase failed at offset 0x%x got 0x%x\n", offs,
++				       *(uint32_t *)buf);
++				return;
++			}
++			offs += SPI_NAND_BLOCK_SIZE;
++		}
++		printf("Flash erase succeeded!\n");
++	}
++
++	printf("\nTest 2: Flash write\n");
++
++	size_t offs = SPI_NAND_TEST_REGION_OFFSET;
++
++	while (offs < SPI_NAND_TEST_REGION_OFFSET + 2 * SPI_NAND_BLOCK_SIZE) {
++		printf("Attempting to write %zu bytes at offset 0x%x\n", len, offs);
++		rc = flash_write(flash_dev, offs, buf_wr, len);
++		if (rc != 0) {
++			printf("Flash write failed! %d\n", rc);
++			return;
++		}
++
++		memset(buf, 0, len);
++		rc = flash_read(flash_dev, offs, buf, len);
++		if (rc != 0) {
++			printf("Flash read failed! %d\n", rc);
++			return;
++		}
++
++		if (memcmp(buf_wr, buf, len) == 0) {
++			printf("Data read matches data written. Good!!\n");
++		} else {
++			const uint8_t *wp = buf_wr;
++			const uint8_t *rp = buf;
++			const uint8_t *rpe = rp + len;
++
++			printf("Data read does not match data written!!\n");
++			while (rp < rpe) {
++				printf("%08x wrote %02x read %02x %s\n",
++				       (uint32_t)(offs + (rp - buf)), *wp, *rp,
++				       (*rp == *wp) ? "match" : "MISMATCH");
++				++rp;
++				++wp;
++			}
++		}
++		offs += SPI_NAND_BLOCK_SIZE;
++	}
++}
++#endif
++
++int main(void)
++{
++	const struct device *flash_dev = DEVICE_DT_GET_ONE(SPI_NAND_COMPAT);
++
++	if (!device_is_ready(flash_dev)) {
++		printk("%s: device not ready.\n", flash_dev->name);
++		return 0;
++	}
++
++	printf("\n%s SPI NAND flash testing\n", flash_dev->name);
++	printf("==========================\n");
++
++	single_sector_test(flash_dev);
++#if defined SPI_NAND_MULTI_SECTOR_TEST
++	multi_sector_test(flash_dev);
++#endif
++	return 0;
++}
