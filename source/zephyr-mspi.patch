@@ -1,0 +1,4547 @@
+diff --git a/boards/digilent/zybo/zybo.dts b/boards/digilent/zybo/zybo.dts
+index a80db74a069..7a486288c29 100644
+--- a/boards/digilent/zybo/zybo.dts
++++ b/boards/digilent/zybo/zybo.dts
+@@ -79,7 +79,7 @@
+ &uart1 {
+ 	status = "okay";
+ 	current-speed = <115200>;
+-	clock-frequency = <100000000>;
++	clock-frequency = <50000000>;
+ 	pinctrl-0 = <&pinctrl_uart1_default>;
+ 	pinctrl-names = "default";
+ };
+diff --git a/boards/st/nucleo_l476rg/Kconfig.defconfig b/boards/st/nucleo_l476rg/Kconfig.defconfig
+index 276fdc47b58..6b6b528f4a4 100644
+--- a/boards/st/nucleo_l476rg/Kconfig.defconfig
++++ b/boards/st/nucleo_l476rg/Kconfig.defconfig
+@@ -6,8 +6,6 @@
+ 
+ if BOARD_NUCLEO_L476RG
+ 
+-config SPI_STM32_INTERRUPT
+-	default y
+-	depends on SPI
++
+ 
+ endif # BOARD_NUCLEO_L476RG
+diff --git a/boards/st/nucleo_l476rg/arduino_r3_connector.dtsi b/boards/st/nucleo_l476rg/arduino_r3_connector.dtsi
+index bccf9e6206f..0ad511344e1 100644
+--- a/boards/st/nucleo_l476rg/arduino_r3_connector.dtsi
++++ b/boards/st/nucleo_l476rg/arduino_r3_connector.dtsi
+@@ -3,37 +3,3 @@
+  *
+  * SPDX-License-Identifier: Apache-2.0
+  */
+-
+-/ {
+-	arduino_header: connector {
+-		compatible = "arduino-header-r3";
+-		#gpio-cells = <2>;
+-		gpio-map-mask = <0xffffffff 0xffffffc0>;
+-		gpio-map-pass-thru = <0 0x3f>;
+-		gpio-map = <0 0 &gpioa 0 0>,	/* A0 */
+-			   <1 0 &gpioa 1 0>,	/* A1 */
+-			   <2 0 &gpioa 4 0>,	/* A2 */
+-			   <3 0 &gpiob 0 0>,	/* A3 */
+-			   <4 0 &gpioc 1 0>,	/* A4 */
+-			   <5 0 &gpioc 0 0>,	/* A5 */
+-			   <6 0 &gpioa 3 0>,	/* D0 */
+-			   <7 0 &gpioa 2 0>,	/* D1 */
+-			   <8 0 &gpioa 10 0>,	/* D2 */
+-			   <9 0 &gpiob 3 0>,	/* D3 */
+-			   <10 0 &gpiob 5 0>,	/* D4 */
+-			   <11 0 &gpiob 4 0>,	/* D5 */
+-			   <12 0 &gpiob 10 0>,	/* D6 */
+-			   <13 0 &gpioa 8 0>,	/* D7 */
+-			   <14 0 &gpioa 9 0>,	/* D8 */
+-			   <15 0 &gpioc 7 0>,	/* D9 */
+-			   <16 0 &gpiob 6 0>,	/* D10 */
+-			   <17 0 &gpioa 7 0>,	/* D11 */
+-			   <18 0 &gpioa 6 0>,	/* D12 */
+-			   <19 0 &gpioa 5 0>,	/* D13 */
+-			   <20 0 &gpiob 9 0>,	/* D14 */
+-			   <21 0 &gpiob 8 0>;	/* D15 */
+-	};
+-};
+-
+-arduino_i2c: &i2c1 {};
+-arduino_spi: &spi1 {};
+diff --git a/boards/st/nucleo_l476rg/nucleo_l476rg.dts b/boards/st/nucleo_l476rg/nucleo_l476rg.dts
+index 4a63a5ad328..cf8d67b636a 100644
+--- a/boards/st/nucleo_l476rg/nucleo_l476rg.dts
++++ b/boards/st/nucleo_l476rg/nucleo_l476rg.dts
+@@ -25,7 +25,7 @@
+ 	leds: leds {
+ 		compatible = "gpio-leds";
+ 		green_led_2: led_2 {
+-			gpios = <&gpioa 5 GPIO_ACTIVE_HIGH>;
++			gpios = <&gpioc 2 GPIO_ACTIVE_HIGH>;
+ 			label = "User LD2";
+ 		};
+ 	};
+@@ -58,7 +58,13 @@
+ &clk_hsi {
+ 	status = "okay";
+ };
++&gpioc {
++	status = "okay";
++};
+ 
++&gpioa {
++	status = "okay";
++};
+ &pll {
+ 	div-m = <1>;
+ 	mul-n = <20>;
+diff --git a/boards/st/nucleo_l476rg/nucleo_l476rg_defconfig b/boards/st/nucleo_l476rg/nucleo_l476rg_defconfig
+index 72ba65e4faf..dec3f159430 100644
+--- a/boards/st/nucleo_l476rg/nucleo_l476rg_defconfig
++++ b/boards/st/nucleo_l476rg/nucleo_l476rg_defconfig
+@@ -1,14 +1,14 @@
+ # SPDX-License-Identifier: Apache-2.0
+ 
+ # enable uart driver
+-CONFIG_SERIAL=y
++#CONFIG_SERIAL=y
+ 
+ # enable GPIO
+ CONFIG_GPIO=y
+ 
+ # console
+-CONFIG_CONSOLE=y
+-CONFIG_UART_CONSOLE=y
++#CONFIG_CONSOLE=y
++#CONFIG_UART_CONSOLE=y
+ 
+ #enable MPU
+ CONFIG_ARM_MPU=y
+diff --git a/boards/st/nucleo_l476rg/st_morpho_connector.dtsi b/boards/st/nucleo_l476rg/st_morpho_connector.dtsi
+index 3c0d419f02f..fb7b80f0f63 100644
+--- a/boards/st/nucleo_l476rg/st_morpho_connector.dtsi
++++ b/boards/st/nucleo_l476rg/st_morpho_connector.dtsi
+@@ -6,62 +6,3 @@
+ #include <zephyr/dt-bindings/gpio/gpio.h>
+ #include <zephyr/dt-bindings/gpio/st-morpho-header.h>
+ 
+-/ {
+-	st_morpho_header: st-morpho-header {
+-		compatible = "st-morpho-header";
+-		#gpio-cells = <2>;
+-		gpio-map-mask = <ST_MORPHO_PIN_MASK 0x0>;
+-		gpio-map-pass-thru = <0x0 GPIO_DT_FLAGS_MASK>;
+-		gpio-map = <ST_MORPHO_L_1 0 &gpioc 10 0>,
+-			   <ST_MORPHO_L_2 0 &gpioc 11 0>,
+-			   <ST_MORPHO_L_3 0 &gpioc 12 0>,
+-			   <ST_MORPHO_L_4 0 &gpiod 2 0>,
+-			   <ST_MORPHO_L_13 0 &gpioa 13 0>,
+-			   <ST_MORPHO_L_15 0 &gpioa 14 0>,
+-			   <ST_MORPHO_L_17 0 &gpioa 15 0>,
+-			   <ST_MORPHO_L_21 0 &gpiob 7 0>,
+-			   <ST_MORPHO_L_23 0 &gpioc 13 0>,
+-			   <ST_MORPHO_L_25 0 &gpioc 14 0>,
+-			   <ST_MORPHO_L_27 0 &gpioc 15 0>,
+-			   <ST_MORPHO_L_28 0 &gpioa 0 0>,
+-			   <ST_MORPHO_L_29 0 &gpioh 0 0>,
+-			   <ST_MORPHO_L_30 0 &gpioa 1 0>,
+-			   <ST_MORPHO_L_31 0 &gpioh 1 0>,
+-			   <ST_MORPHO_L_32 0 &gpioa 4 0>,
+-			   <ST_MORPHO_L_34 0 &gpiob 0 0>,
+-			   <ST_MORPHO_L_35 0 &gpioc 2 0>,
+-			   <ST_MORPHO_L_36 0 &gpioc 1 0>, /* SB56=ON, SB46=OFF */
+-			   <ST_MORPHO_L_37 0 &gpioc 3 0>,
+-			   <ST_MORPHO_L_38 0 &gpioc 0 0>, /* SB51=ON, SB52=OFF */
+-			   <ST_MORPHO_R_1 0 &gpioc 9 0>,
+-			   <ST_MORPHO_R_2 0 &gpioc 8 0>,
+-			   <ST_MORPHO_R_3 0 &gpiob 8 0>,
+-			   <ST_MORPHO_R_4 0 &gpioc 6 0>,
+-			   <ST_MORPHO_R_5 0 &gpiob 9 0>,
+-			   <ST_MORPHO_R_6 0 &gpioc 5 0>,
+-			   <ST_MORPHO_R_11 0 &gpioa 5 0>,
+-			   <ST_MORPHO_R_12 0 &gpioa 12 0>,
+-			   <ST_MORPHO_R_13 0 &gpioa 6 0>,
+-			   <ST_MORPHO_R_14 0 &gpioa 11 0>,
+-			   <ST_MORPHO_R_15 0 &gpioa 7 0>,
+-			   <ST_MORPHO_R_16 0 &gpiob 12 0>,
+-			   <ST_MORPHO_R_17 0 &gpiob 6 0>,
+-			   <ST_MORPHO_R_18 0 &gpiob 11 0>,
+-			   <ST_MORPHO_R_19 0 &gpioc 7 0>,
+-			   <ST_MORPHO_R_21 0 &gpioa 9 0>,
+-			   <ST_MORPHO_R_22 0 &gpiob 2 0>,
+-			   <ST_MORPHO_R_23 0 &gpioa 8 0>,
+-			   <ST_MORPHO_R_24 0 &gpiob 1 0>,
+-			   <ST_MORPHO_R_25 0 &gpiob 10 0>,
+-			   <ST_MORPHO_R_26 0 &gpiob 15 0>,
+-			   <ST_MORPHO_R_27 0 &gpiob 4 0>,
+-			   <ST_MORPHO_R_28 0 &gpiob 14 0>,
+-			   <ST_MORPHO_R_29 0 &gpiob 5 0>,
+-			   <ST_MORPHO_R_30 0 &gpiob 13 0>,
+-			   <ST_MORPHO_R_31 0 &gpiob 3 0>,
+-			   <ST_MORPHO_R_33 0 &gpioa 10 0>,
+-			   <ST_MORPHO_R_34 0 &gpioc 4 0>,
+-			   <ST_MORPHO_R_35 0 &gpioa 2 0>,
+-			   <ST_MORPHO_R_37 0 &gpioa 3 0>;
+-	};
+-};
+diff --git a/drivers/flash/CMakeLists.txt b/drivers/flash/CMakeLists.txt
+index 8fa4072da49..f2055d071e9 100644
+--- a/drivers/flash/CMakeLists.txt
++++ b/drivers/flash/CMakeLists.txt
+@@ -67,6 +67,8 @@ zephyr_library_sources_ifdef(CONFIG_SOC_FLASH_SMARTBOND flash_smartbond.c)
+ zephyr_library_sources_ifdef(CONFIG_SOC_FLASH_TELINK_B91 soc_flash_b91.c)
+ zephyr_library_sources_ifdef(CONFIG_SOC_FLASH_XMC4XXX soc_flash_xmc4xxx.c)
+ zephyr_library_sources_ifdef(CONFIG_SPI_FLASH_AT45 spi_flash_at45.c)
++zephyr_library_sources_ifdef(CONFIG_SPI_NAND bch.c)
++zephyr_library_sources_ifdef(CONFIG_SPI_NAND spi_nand.c)
+ zephyr_library_sources_ifdef(CONFIG_SPI_NOR spi_nor.c)
+ # zephyr-keep-sorted-stop
+ 
+diff --git a/drivers/flash/Kconfig b/drivers/flash/Kconfig
+index bdd84f25814..f8180c4814c 100644
+--- a/drivers/flash/Kconfig
++++ b/drivers/flash/Kconfig
+@@ -181,6 +181,7 @@ source "drivers/flash/Kconfig.lpc"
+ source "drivers/flash/Kconfig.max32"
+ source "drivers/flash/Kconfig.mcux"
+ source "drivers/flash/Kconfig.mspi"
++source "drivers/flash/Kconfig.nand"
+ source "drivers/flash/Kconfig.nios2_qspi"
+ source "drivers/flash/Kconfig.nor"
+ source "drivers/flash/Kconfig.nordic_qspi_nor"
+diff --git a/drivers/flash/Kconfig.nand b/drivers/flash/Kconfig.nand
+new file mode 100644
+index 00000000000..c7f65e62aba
+--- /dev/null
++++ b/drivers/flash/Kconfig.nand
+@@ -0,0 +1,23 @@
++# Copyright (c) 2022-2025 Macronix International Co., Ltd.
++# SPDX-License-Identifier: Apache-2.0
++
++menuconfig SPI_NAND
++	bool "SPI NAND Flash"
++	default y
++	depends on DT_HAS_JEDEC_SPI_NAND_ENABLED
++	select FLASH_HAS_DRIVER_ENABLED
++	select FLASH_HAS_EXPLICIT_ERASE
++	select FLASH_HAS_PAGE_LAYOUT
++	select SPI
++
++if SPI_NAND
++
++config SPI_NAND_INIT_PRIORITY
++	int
++	default 80
++	help
++	  Device driver initialization priority.
++	  Device is connected to SPI bus, it has to
++	  be initialized after SPI driver.
++
++endif # SPI_NAND
+diff --git a/drivers/flash/bch.c b/drivers/flash/bch.c
+new file mode 100644
+index 00000000000..819debcdb3e
+--- /dev/null
++++ b/drivers/flash/bch.c
+@@ -0,0 +1,456 @@
++/*
++ * Copyright (c) 2022-2025 Macronix International Co., Ltd.
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++#include <stdint.h>
++#include <stdlib.h>
++#include <string.h>
++#include "bch.h"
++#include <zephyr/drivers/spi.h>
++
++int find_last_set(int x)
++{
++	int r = 32;
++
++	if (!x) {
++		return 0;
++	}
++	if (!(x & 0xffff0000u)) {
++		x <<= 16;
++		r -= 16;
++	}
++	if (!(x & 0xff000000u)) {
++		x <<= 8;
++		r -= 8;
++	}
++	if (!(x & 0xf0000000u)) {
++		x <<= 4;
++		r -= 4;
++	}
++	if (!(x & 0xc0000000u)) {
++		x <<= 2;
++		r -= 2;
++	}
++	if (!(x & 0x80000000u)) {
++		x <<= 1;
++		r -= 1;
++	}
++	return r;
++}
++
++void bch_encode(struct bch_code *bch, unsigned char *data, unsigned int *ecc)
++{
++	int i, j, k, mlen;
++	unsigned int w;
++	unsigned int *p;
++	unsigned int *c[16];
++	unsigned int *t[16];
++
++	t[0] = bch->mod_tab;
++	for (i = 1; i < 16; i++) {
++		t[i] = t[i-1] + 4 * (bch->ecc_words);
++	}
++
++	memset(bch->ecc, 0, bch->ecc_words * sizeof(*bch->ecc));
++
++	p = (unsigned int *)data;
++	mlen  = bch->len / 4;
++
++	while (mlen--) {
++		if (!bch->endian) {
++			w = ((unsigned int)(*p) & 0xff000000) >> 24 |
++			    ((unsigned int)(*p) & 0x00ff0000) >> 8  |
++			    ((unsigned int)(*p) & 0x0000ff00) << 8  |
++			    ((unsigned int)(*p) & 0x000000ff) << 24;
++		} else {
++			w = *p;
++		}
++		p++;
++		w ^= bch->ecc[0];
++		k = 0;
++		for (i = 0; i < 16; i++) {
++			c[i] = t[i] + (bch->ecc_words) * ((w >> k) & 0x03);
++			k = k + 2;
++		}
++
++		for (i = 0; i < bch->ecc_words - 1; i++) {
++			bch->ecc[i] = bch->ecc[i + 1];
++			for (j = 0; j < 16; j++) {
++				bch->ecc[i] ^= c[j][i];
++			}
++		}
++		bch->ecc[i] = c[0][i];
++		for (j = 1; j < 16; j++) {
++			bch->ecc[i] ^= c[j][i];
++		}
++	}
++
++	if (ecc != NULL) {
++		for (i = 0; i < bch->ecc_words; i++) {
++			ecc[i] = bch->ecc[i];
++		}
++	}
++}
++
++static inline int mod(struct bch_code *bch, unsigned int v)
++{
++	while (v >= bch->n) {
++		v -= bch->n;
++		v = (v & bch->n) + (v >> bch->m);
++	}
++	return v;
++}
++
++static void build_syndrome(struct bch_code *bch)
++{
++	int i, j;
++	int ecc_bits;
++	unsigned int *ecc;
++
++	memset(bch->syn, 0, 2 * bch->t * sizeof(*bch->syn));
++
++	ecc_bits = bch->ecc_bits;
++	ecc = bch->ecc;
++	while (ecc_bits > 0) {
++		i = ecc_bits - 32;
++		ecc_bits = i;
++		while (*ecc) {
++			if (*ecc & 1) {
++				for (j = 0; j < 2*bch->t; j++) {
++					bch->syn[j] ^= bch->a_pow[mod(bch, (j+1)*i)];
++				}
++			}
++			*ecc >>= 1;
++			i++;
++		}
++		ecc++;
++	}
++}
++
++static int build_error_location_poly(struct bch_code *bch)
++{
++	int i, j, k;
++	unsigned int tmp, dp = 1, d = bch->syn[0];
++	int deg, buf_deg, tmp_deg;
++	int pp = -1;
++
++	memset(bch->elp, 0, (bch->t + 1) * sizeof(*bch->elp));
++
++	buf_deg = 0;
++	bch->buf[0] = 1;
++	deg = 0;
++	bch->elp[0] = 1;
++
++	for (i = 0; (i < bch->t) && (deg <= bch->t); i++) {
++		if (d) {
++			k = 2 * i-pp;
++			if (buf_deg + k > deg) {
++				tmp_deg = deg;
++				for (j = 0; j <= deg; j++) {
++					bch->buf2[j] = bch->elp[j];
++				}
++			}
++			tmp = bch->n + bch->a_log[d] - bch->a_log[dp];
++
++			for (j = 0; j <= buf_deg; j++) {
++				if (bch->buf[j]) {
++					bch->elp[j+k] ^= bch->a_pow[mod(bch, tmp +
++						bch->a_log[bch->buf[j]])];
++				}
++			}
++			if (buf_deg+k > deg) {
++				deg = buf_deg + k;
++				buf_deg = tmp_deg;
++				for (j = 0; j <= tmp_deg; j++) {
++					bch->buf[j] = bch->buf2[j];
++				}
++				dp = d;
++				pp = 2 * i;
++			}
++		}
++		if (i < bch->t - 1) {
++			k = 2 * i + 1;
++			d = bch->syn[k + 1];
++			for (j = 1; j <= deg; j++) {
++				if (bch->elp[j] && bch->syn[k]) {
++					d ^= bch->a_pow[mod(bch, bch->a_log[bch->elp[j]] +
++						bch->a_log[bch->syn[k]])];
++				}
++				k--;
++			}
++		}
++	}
++	return (deg > bch->t) ? -1 : deg;
++}
++
++static int chien_search(struct bch_code *bch, int deg)
++{
++	int i, j, k, nroot = 0;
++	unsigned int syn, syn0;
++	int *rep  = (int *) bch->buf;
++	int *root = (int *) bch->buf2;
++
++	k = bch->n - bch->a_log[bch->elp[deg]];
++	for (i = 0; i < deg; i++) {
++		rep[i] = bch->elp[i] ? mod(bch, bch->a_log[bch->elp[i]] + k) : -1;
++	}
++	rep[i] = 0;
++
++	syn0 = bch->elp[0] ? bch->a_pow[rep[0]] : 0;
++	for (i = 0; i <= bch->n; i++) {
++		for (j = 1, syn = syn0; j <= deg; j++) {
++			if (rep[j] >= 0) {
++				syn ^= bch->a_pow[mod(bch, rep[j] + j * i)];
++			}
++		}
++		if (syn == 0) {
++			root[nroot++] = bch->n - i;
++			if (nroot == deg) {
++				return nroot;
++			}
++		}
++	}
++	return 0;
++}
++
++int bch_decode(struct bch_code *bch, unsigned char *data, unsigned int *ecc)
++{
++	unsigned int nbits;
++	int i, err, nroot;
++	int *root = (int *) bch->buf2;
++
++	bch_encode(bch, data, NULL);
++
++	for (i = 0, err = 0; i < bch->ecc_words; i++) {
++		bch->ecc[i] ^= ecc[i];
++		err |= bch->ecc[i];
++	}
++	if (!err) {
++		return 0;
++	}
++	build_syndrome(bch);
++	err = build_error_location_poly(bch);
++	if (err <= 0) {
++		return -1;
++	}
++
++	nroot = chien_search(bch, err);
++	if (err != nroot) {
++		return -1;
++	}
++	nbits = (bch->len * 8) + bch->ecc_bits;
++	for (i = 0; i < err; i++) {
++		root[i] = nbits - 1 - root[i];
++		root[i] = (root[i] & ~7) | (7 - (root[i] & 7));
++		data[root[i]/8] ^= 1 << root[i]%8;
++	}
++
++	return err;
++}
++
++static void build_gf_table(struct bch_code *bch)
++{
++	unsigned int i, x;
++	unsigned int msb, poly;
++	unsigned int prim_poly[5] = {0x11d, 0x211, 0x409, 0x805, 0x1053};
++
++	poly = prim_poly[bch->m - 8];
++	msb = 1 << bch->m;
++	bch->a_pow[0] = 1;
++	bch->a_log[1] = 0;
++	x = 2;
++	for (i = 1; i < bch->n; i++) {
++		bch->a_pow[i] = x;
++		bch->a_log[x] = i;
++		x <<= 1;
++		if (x & msb) {
++			x ^= poly;
++		}
++	}
++	bch->a_pow[bch->n] = 1;
++	bch->a_log[0] = 0;
++}
++
++static void build_mod_tables(struct bch_code *bch, const unsigned int *g)
++{
++	int i, j, b, d;
++	unsigned int data, hi, lo, *tab, poly;
++	int plen = (bch->ecc_bits + 32) / 32;
++	int ecclen = (bch->ecc_bits + 31) / 32;
++
++	memset(bch->mod_tab, 0, 16 * 4 * bch->ecc_words * sizeof(*bch->mod_tab));
++
++	for (i = 0; i < 4; i++) {
++		for (b = 0; b < 16; b++) {
++			tab = bch->mod_tab + (b*4+i)*bch->ecc_words;
++			data = i << (2*b);
++			while (data) {
++				d = 0;
++				poly = (data >> 1);
++				while (poly) {
++					poly >>= 1;
++					d++;
++				}
++				data ^= g[0] >> (31 - d);
++				for (j = 0; j < ecclen; j++) {
++					hi = (d < 31) ? g[j] << (d + 1) : 0;
++					lo = (j + 1 < plen) ? g[j + 1] >> (31 - d) : 0;
++					tab[j] ^= hi | lo;
++				}
++			}
++		}
++	}
++}
++
++static void *bch_alloc(size_t size, int *err)
++{
++	void *ptr = NULL;
++
++	if (*err == 0) {
++		ptr = k_malloc(size);
++	}
++	if (ptr == NULL) {
++		*err = 1;
++	}
++	return ptr;
++}
++
++static unsigned int *build_generator_poly(struct bch_code *bch)
++{
++	int i, j, k;
++	int m, t;
++	int err = 0;
++	unsigned int n;
++	unsigned int *x;
++	unsigned int *g;
++
++	x = bch_alloc((bch->m * bch->t + 1) * sizeof(*x), &err);
++	g = bch_alloc((bch->ecc_words + 1)  * sizeof(*g), &err);
++
++	if (err) {
++		k_free(g);
++		k_free(x);
++		bch_free(bch);
++		return NULL;
++	}
++
++	bch->ecc_bits = 0;
++	x[0] = 1;
++	for (t = 0; t < bch->t; t++) {
++		for (m = 0, i = 2 * t + 1; m < bch->m; m++) {
++			x[bch->ecc_bits + 1] = 1;
++			for (j = bch->ecc_bits; j > 0; j--) {
++				if (x[j]) {
++					x[j] = bch->a_pow[mod(bch, bch->a_log[x[j]] +
++						i)] ^ x[j - 1];
++				} else {
++					x[j] = x[j-1];
++				}
++			}
++			if (x[j]) {
++				x[j] = bch->a_pow[mod(bch, bch->a_log[x[j]] + i)];
++			}
++			bch->ecc_bits++;
++			i = mod(bch, 2 * i);
++		}
++	}
++
++	i = 0;
++	memset(g, 0, (bch->ecc_words + 1) * sizeof(*g));
++
++	for (k = bch->ecc_bits + 1; k > 0; k = k - n) {
++		n = (k > 32) ? 32 : k;
++		for (j = 0; j < n; j++) {
++			if (x[k-1-j]) {
++				g[i] |= 1 << (31 - j);
++			}
++		}
++		i++;
++	}
++
++	k_free(x);
++	return g;
++}
++
++struct bch_code *bch_init(int m, int t)
++{
++	int err = 0;
++	unsigned int *genpoly;
++	struct bch_code *bch = NULL;
++
++	short int a = 0x1234;
++	char *p = (char *)&a;
++
++	if ((m < 8) || (m > 12)) {
++		return NULL;
++	}
++	if ((t < 1) || (t > 12)) {
++		return NULL;
++	}
++
++	bch = (struct bch_code *)k_malloc(sizeof(struct bch_code));
++
++	if (bch == NULL) {
++		return NULL;
++	}
++
++	bch->m = m;
++	bch->t = t;
++	bch->n = (1 << m)-1;
++	bch->ecc_words  = (m * t + 31) / 32;
++	bch->len        = (bch->n + 1) / 8;
++	bch->a_pow      = bch_alloc((1 + bch->n)*sizeof(*bch->a_pow), &err);
++	bch->a_log      = bch_alloc((1 + bch->n)*sizeof(*bch->a_log), &err);
++	bch->mod_tab    = bch_alloc(bch->ecc_words * 16 * 4 * sizeof(*bch->mod_tab), &err);
++	bch->ecc        = bch_alloc(bch->ecc_words * sizeof(*bch->ecc), &err);
++	bch->syn        = bch_alloc(2 * t * sizeof(*bch->syn), &err);
++	bch->elp        = bch_alloc((t + 1) * sizeof(*bch->elp), &err);
++	bch->buf        = bch_alloc((t + 1) * sizeof(*bch->buf), &err);
++	bch->buf2       = bch_alloc((t + 1) * sizeof(*bch->buf2), &err);
++	bch->input_data = bch_alloc((1 << m) / 8, &err);
++
++	if (*p == 0x34) {
++		bch->endian = 0;
++	} else if (*p == 0x12) {
++		bch->endian = 1;
++	} else {
++		err = 1;
++	}
++
++	if (err) {
++		bch_free(bch);
++		return NULL;
++	}
++
++	build_gf_table(bch);
++	genpoly = build_generator_poly(bch);
++	if (genpoly == NULL) {
++		return NULL;
++	}
++
++	build_mod_tables(bch, genpoly);
++	k_free(genpoly);
++
++	if (err) {
++		bch_free(bch);
++		return NULL;
++	}
++
++	return bch;
++}
++
++void bch_free(struct bch_code *bch)
++{
++	if (bch) {
++		k_free(bch->a_pow);
++		k_free(bch->a_log);
++		k_free(bch->mod_tab);
++		k_free(bch->ecc);
++		k_free(bch->syn);
++		k_free(bch->elp);
++		k_free(bch->buf);
++		k_free(bch->buf2);
++		k_free(bch);
++	}
++}
+diff --git a/drivers/flash/bch.h b/drivers/flash/bch.h
+new file mode 100644
+index 00000000000..caafef1d6d8
+--- /dev/null
++++ b/drivers/flash/bch.h
+@@ -0,0 +1,74 @@
++/*
++ * Copyright (c) 2022-2025 Macronix International Co., Ltd.
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++#ifndef _BCH_H
++#define _BCH_H
++
++#include <stdint.h>
++
++#define DIV_ROUND_UP(n, d)  (((n) + (d) - 1) / (d))
++
++struct bch_code {
++	int    m;
++	int    n;
++	int    t;
++	int    ecc_bits;
++	int    ecc_words;
++	int    len;
++	unsigned int   *a_pow;
++	unsigned int   *a_log;
++	unsigned int   *mod_tab;
++	unsigned int   *ecc;
++	unsigned int   *syn;
++	unsigned int   *elp;
++	unsigned int   *buf;
++	unsigned int   *buf2;
++	unsigned char   *input_data;
++	int   endian;
++};
++
++/**
++ * bch_init - Initialize the BCH encoder/decoder
++ * @m: The m value of the encoder, specifying the block size as 2^m bytes
++ * @t: The t value of the encoder, specifying the error correction capability as t
++ *
++ * Returns: A pointer to the initialized BCH encoder/decoder, or NULL if initialization fails
++ */
++struct bch_code *bch_init(int m, int t);
++
++/**
++ * bch_free - Free the memory occupied by the BCH encoder/decoder
++ * @bch: The pointer to the BCH encoder/decoder to be freed
++ */
++void bch_free(struct bch_code *bch);
++
++/**
++ * bch_encode - Encode the data using the BCH encoder
++ * @bch: The pointer to the BCH encoder
++ * @data: The pointer to the data to be encoded
++ * @ecc: The pointer to store the encoded error correction code
++ */
++void bch_encode(struct bch_code *bch, unsigned char *data, unsigned int *ecc);
++
++/**
++ * bch_decode - Decode the data using the BCH encoder
++ * @bch: The pointer to the BCH encoder
++ * @data: The pointer to the data to be decoded
++ * @ecc: The pointer to store and retrieve the error correction code
++ *
++ * Returns: 0 if decoding is successful, -1 if errors cannot be corrected,
++ *          or the number of corrected bits if errors are corrected
++ */
++int bch_decode(struct bch_code *bch, unsigned char *data, unsigned int *ecc);
++
++/**
++ * find_last_set - Return the index of the highest set bit in an integer (counting from 1)
++ * @x: The integer to find the index of the highest set bit
++ *
++ * Returns: The index of the highest set bit in x, or 0 if x is 0
++ */
++int find_last_set(int x);
++
++#endif
+diff --git a/drivers/flash/flash_mspi_nor.c b/drivers/flash/flash_mspi_nor.c
+index e297b01f5d9..c55b59a5fea 100644
+--- a/drivers/flash/flash_mspi_nor.c
++++ b/drivers/flash/flash_mspi_nor.c
+@@ -636,20 +636,20 @@ static int flash_chip_init(const struct device *dev)
+ 	enum mspi_io_mode io_mode = dev_config->mspi_nor_cfg.io_mode;
+ 	uint8_t id[JESD216_READ_ID_LEN] = {0};
+ 	int rc;
+-
++printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
+ 	rc = dev_cfg_apply(dev, &dev_config->mspi_nor_init_cfg);
+ 
+ 	if (rc < 0) {
+ 		return rc;
+ 	}
+-
++printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
+ 	/* Some chips reuse RESET pin for data in Quad modes:
+ 	 * force single line mode before resetting.
+ 	 */
+ 	if ((io_mode == MSPI_IO_MODE_SINGLE) || (io_mode == MSPI_IO_MODE_QUAD_1_1_4) ||
+ 	    (io_mode == MSPI_IO_MODE_QUAD_1_4_4)) {
+ 		rc = quad_enable_set(dev, false);
+-
++printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
+ 		if (rc < 0) {
+ 			LOG_ERR("Failed to switch to single line mode: %d", rc);
+ 			return rc;
+@@ -662,7 +662,7 @@ static int flash_chip_init(const struct device *dev)
+ 			return rc;
+ 		}
+ 	}
+-
++printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
+ #if defined(WITH_RESET_GPIO)
+ 	rc = gpio_reset(dev);
+ 
+@@ -671,24 +671,31 @@ static int flash_chip_init(const struct device *dev)
+ 		return rc;
+ 	}
+ #endif
++printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
+ 
+ 	flash_mspi_command_set(dev, &commands_single.id);
+ 	dev_data->packet.data_buf  = id;
+ 	dev_data->packet.num_bytes = sizeof(id);
++printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
+ 
+ 	rc = mspi_transceive(dev_config->bus, &dev_config->mspi_id,
+ 			     &dev_data->xfer);
+ 	if (rc < 0) {
++		printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
++
+ 		LOG_ERR("Failed to read JEDEC ID in initial line mode: %d", rc);
+ 		return rc;
+ 	}
++printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
+ 
+ 	rc = default_io_mode(dev);
++printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
+ 
+ 	if (rc < 0) {
+ 		LOG_ERR("Failed to switch to default io mode: %d", rc);
+ 		return rc;
+ 	}
++printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
+ 
+ 	/* Reading JEDEC ID for mode that forces single lane would be redundant,
+ 	 * since it switches back to single lane mode. Use ID from previous read.
+@@ -700,6 +707,7 @@ static int flash_chip_init(const struct device *dev)
+ 			return rc;
+ 		}
+ 	}
++printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
+ 
+ 	if (memcmp(id, dev_config->jedec_id, sizeof(id)) != 0) {
+ 		LOG_ERR("JEDEC ID mismatch, read: %02x %02x %02x, "
+@@ -710,6 +718,7 @@ static int flash_chip_init(const struct device *dev)
+ 			dev_config->jedec_id[2]);
+ 		return -ENODEV;
+ 	}
++printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
+ 
+ #if defined(CONFIG_MSPI_XIP)
+ 	/* Enable XIP access for this chip if specified so in DT. */
+@@ -721,6 +730,7 @@ static int flash_chip_init(const struct device *dev)
+ 		}
+ 	}
+ #endif
++printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
+ 
+ 	return 0;
+ }
+@@ -730,12 +740,12 @@ static int drv_init(const struct device *dev)
+ 	const struct flash_mspi_nor_config *dev_config = dev->config;
+ 	struct flash_mspi_nor_data *dev_data = dev->data;
+ 	int rc;
+-
++	printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
+ 	if (!device_is_ready(dev_config->bus)) {
+ 		LOG_ERR("Device %s is not ready", dev_config->bus->name);
+ 		return -ENODEV;
+ 	}
+-
++	printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
+ 	rc = pm_device_runtime_get(dev_config->bus);
+ 	if (rc < 0) {
+ 		LOG_ERR("pm_device_runtime_get() failed: %d", rc);
+@@ -743,7 +753,7 @@ static int drv_init(const struct device *dev)
+ 	}
+ 
+ 	rc = flash_chip_init(dev);
+-
++	printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
+ 	/* Release the MSPI controller - it was acquired by the call to
+ 	 * mspi_dev_config() in flash_chip_init().
+ 	 */
+@@ -754,7 +764,7 @@ static int drv_init(const struct device *dev)
+ 	if (rc < 0) {
+ 		return rc;
+ 	}
+-
++	printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
+ 	k_sem_init(&dev_data->acquired, 1, K_SEM_MAX_LIMIT);
+ 
+ 	return pm_device_driver_init(dev, dev_pm_action_cb);
+diff --git a/drivers/flash/spi_nand.c b/drivers/flash/spi_nand.c
+new file mode 100644
+index 00000000000..bc75638068d
+--- /dev/null
++++ b/drivers/flash/spi_nand.c
+@@ -0,0 +1,1028 @@
++/*
++ * Copyright (c) 2022-2025 Macronix International Co., Ltd.
++ *
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++#define DT_DRV_COMPAT jedec_spi_nand
++
++#include <errno.h>
++#include <zephyr/drivers/flash.h>
++#include <zephyr/drivers/spi.h>
++#include <zephyr/init.h>
++#include <string.h>
++#include <zephyr/logging/log.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include "spi_nand.h"
++#include "bch.h"
++
++LOG_MODULE_REGISTER(spi_nand, CONFIG_FLASH_LOG_LEVEL);
++
++/* Indicates that an access command includes bytes for the address.
++ * If not provided the opcode is not followed by address bytes.
++ */
++#define NAND_ACCESS_ADDRESSED BIT(0)
++
++/* Indicates that addressed access uses a 8-bit address regardless of
++ * spi_nand_data::flag_8bit_addr.
++ */
++#define NAND_ACCESS_8BIT_ADDR BIT(1)
++
++/* Indicates that addressed access uses a 16-bit address regardless of
++ * spi_nand_data::flag_16bit_addr.
++ */
++#define NAND_ACCESS_16BIT_ADDR BIT(2)
++
++/* Indicates that addressed access uses a 24-bit address regardless of
++ * spi_nand_data::flag_32bit_addr.
++ */
++#define NAND_ACCESS_24BIT_ADDR BIT(3)
++
++/* Indicates that addressed access uses a 32-bit address regardless of
++ * spi_nand_data::flag_32bit_addr.
++ */
++#define NAND_ACCESS_32BIT_ADDR BIT(4)
++
++/* Indicates that an access command is performing a write.  If not
++ * provided access is a read.
++ */
++#define NAND_ACCESS_WRITE BIT(5)
++
++#define NAND_ACCESS_DUMMY BIT(6)
++
++/* Build-time data associated with the device. */
++struct spi_nand_config {
++	/* Devicetree SPI configuration */
++	struct spi_dt_spec spi;
++
++	uint8_t id[2];
++	uint8_t support_conti_read;
++	uint16_t sub_page_size;
++};
++
++/**
++ * struct spi_nand_data - Structure for defining the SPI NAND access
++ * @sem: The semaphore to access to the flash
++ */
++struct spi_nand_data {
++	struct k_sem sem;
++
++	/* Number of bytes per page */
++	uint16_t page_size;
++
++	/* Number of oob bytes per page */
++	uint8_t oob_size;
++
++	/* Number of pages per block */
++	uint16_t page_num;
++
++	/* Number of bytes per block */
++	uint32_t block_size;
++
++	/* Number of blocks per chip */
++	uint16_t block_num;
++
++	/* Size of flash, in bytes */
++	uint64_t flash_size;
++
++	uint8_t page_shift;
++
++	uint8_t block_shift;
++
++	bool continuous_read;
++
++	bool read_recovery;
++	uint8_t *page_buf;
++
++	struct nand_ecc_info {
++		uint8_t ecc_bits;
++		uint8_t ecc_bytes;
++		uint8_t ecc_steps;
++		uint8_t ecc_layout_pos;
++		uint32_t ecc_size;
++		uint8_t *ecc_calc;
++		uint8_t *ecc_code;
++	} ecc;
++	struct nand_bch_control {
++		struct bch_code      *bch;
++		unsigned int         *errloc;
++		unsigned char        *eccmask;
++	} nbc;
++};
++
++void bch_calculate_ecc(const struct device *dev,
++		unsigned char *buf, unsigned char *code)
++{
++	struct spi_nand_data *data = dev->data;
++
++	memset(code, 0, data->ecc.ecc_bytes);
++
++	bch_encode(data->nbc.bch, buf, (unsigned int *)code);
++}
++
++void bch_correct_data(const struct device *dev,
++		unsigned char *buf, unsigned char *read_ecc,
++		unsigned char *calc_ecc)
++{
++	struct spi_nand_data *data = dev->data;
++
++	bch_decode(data->nbc.bch, buf, (unsigned int *)calc_ecc);
++}
++
++/*
++ * @brief Send an SPI command
++ *
++ * @param dev Device struct
++ * @param opcode The command to send
++ * @param access flags that determine how the command is constructed.
++ *        See NAND_ACCESS_*.
++ * @param addr The address to send
++ * @param data The buffer to store or read the value
++ * @param length The size of the buffer
++ * @return 0 on success, negative errno code otherwise
++ */
++static int spi_nand_access(const struct device *const dev,
++			  uint8_t opcode, unsigned int access,
++			  off_t addr, void *data, size_t length)
++{
++	const struct spi_nand_config *const driver_cfg = dev->config;
++	bool is_addressed = (access & NAND_ACCESS_ADDRESSED) != 0U;
++	bool is_write = (access & NAND_ACCESS_WRITE) != 0U;
++	uint8_t buf[5] = { 0 };
++	uint8_t address_len = 0;
++	struct spi_buf spi_buf[2] = {
++		{
++			.buf = buf,
++			.len = 1,
++		},
++		{
++			.buf = data,
++			.len = length
++		}
++	};
++
++	buf[0] = opcode;
++	if (is_addressed) {
++		union {
++			uint32_t u32;
++			uint8_t u8[4];
++		} addr32 = {
++			.u32 = sys_cpu_to_be32(addr),
++		};
++
++		if (access & NAND_ACCESS_32BIT_ADDR) {
++			address_len = 4;
++		} else if (access & NAND_ACCESS_24BIT_ADDR) {
++			address_len = 3;
++		} else if (access & NAND_ACCESS_16BIT_ADDR) {
++			address_len = 2;
++		} else if (access & NAND_ACCESS_8BIT_ADDR) {
++			address_len = 1;
++		}
++		memcpy(&buf[1], &addr32.u8[4 - address_len], address_len);
++		spi_buf[0].len += address_len;
++	};
++
++	if (access & NAND_ACCESS_DUMMY) {
++		spi_buf[0].len += 1;
++	}
++
++	const struct spi_buf_set tx_set = {
++		.buffers = spi_buf,
++		.count = (length != 0) ? 2 : 1,
++	};
++
++	const struct spi_buf_set rx_set = {
++		.buffers = spi_buf,
++		.count = 2,
++	};
++
++	if (is_write) {
++		return spi_write_dt(&driver_cfg->spi, &tx_set);
++	}
++
++	return spi_transceive_dt(&driver_cfg->spi, &tx_set, &rx_set);
++}
++
++#define spi_nand_cmd_read(dev, opcode, dest, length) \
++	spi_nand_access(dev, opcode, 0, 0, dest, length)
++#define spi_nand_cmd_write(dev, opcode) \
++	spi_nand_access(dev, opcode, NAND_ACCESS_WRITE, 0, NULL, 0)
++
++/* Everything necessary to acquire owning access to the device.
++ *
++ * This means taking the lock .
++ */
++static void acquire_device(const struct device *dev)
++{
++	if (IS_ENABLED(CONFIG_MULTITHREADING)) {
++		struct spi_nand_data *const driver_data = dev->data;
++
++		k_sem_take(&driver_data->sem, K_FOREVER);
++	}
++}
++
++/* Everything necessary to release access to the device.
++ *
++ * This means releasing the lock.
++ */
++static void release_device(const struct device *dev)
++{
++	if (IS_ENABLED(CONFIG_MULTITHREADING)) {
++		struct spi_nand_data *const driver_data = dev->data;
++
++		k_sem_give(&driver_data->sem);
++	}
++}
++
++
++static int spi_nand_get_feature(const struct device *dev,
++				uint8_t feature_addr, uint8_t *val)
++{
++	int ret = spi_nand_access(dev, SPI_NAND_CMD_GET_FEATURE,
++			NAND_ACCESS_ADDRESSED | NAND_ACCESS_8BIT_ADDR,
++			feature_addr, val, sizeof(*val));
++
++	return ret;
++}
++
++static int spi_nand_set_feature(const struct device *dev,
++				uint8_t feature_addr, uint8_t val)
++{
++	int ret = spi_nand_access(dev, SPI_NAND_CMD_SET_FEATURE,
++			NAND_ACCESS_WRITE | NAND_ACCESS_ADDRESSED | NAND_ACCESS_8BIT_ADDR,
++			feature_addr, &val, sizeof(val));
++
++	return ret;
++}
++
++/**
++ * @brief Wait until the flash is ready
++ *
++ * @note The device must be externally acquired before invoking this
++ * function.
++ *
++ * This function should be invoked after every ERASE, PROGRAM, or
++ * WRITE_STATUS operation before continuing.  This allows us to assume
++ * that the device is ready to accept new commands at any other point
++ * in the code.
++ *
++ * @param dev The device structure
++ * @return 0 on success, negative errno code otherwise
++ */
++static int spi_nand_wait_until_ready(const struct device *dev)
++{
++	int ret;
++	uint8_t reg = 0;
++
++	do {
++		ret = spi_nand_get_feature(dev, SPI_NAND_FEA_ADDR_STATUS, &reg);
++	} while (!ret && (reg & SPI_NAND_WIP_BIT));
++
++	return ret;
++}
++
++static int spi_nand_read_recovery_mode_set(const struct device *dev, uint8_t read_recovery_mode)
++{
++	int ret;
++
++	acquire_device(dev);
++
++	ret = spi_nand_set_feature(dev, SPI_NAND_FEA_ADDR_RECOVERY, read_recovery_mode);
++	if (ret != 0) {
++		LOG_ERR("set feature failed: %d", ret);
++	}
++
++	release_device(dev);
++	return ret;
++}
++
++static int spi_nand_conti_read_enable(const struct device *dev, bool conti)
++{
++	int ret;
++	uint8_t secur_reg = 0;
++
++	acquire_device(dev);
++
++	ret = spi_nand_get_feature(dev, SPI_NAND_FEA_ADDR_CONF_B0, &secur_reg);
++	if (ret != 0) {
++		LOG_ERR("get feature failed: %d", ret);
++		goto out;
++	}
++
++	if (conti) {
++		secur_reg |= SPINAND_SECURE_BIT_CONT;
++	} else {
++		secur_reg &= ~SPINAND_SECURE_BIT_CONT;
++	}
++
++	ret = spi_nand_set_feature(dev, SPI_NAND_FEA_ADDR_CONF_B0, secur_reg);
++	if (ret != 0) {
++		LOG_ERR("set feature failed: %d", ret);
++		goto out;
++	}
++
++	ret = spi_nand_get_feature(dev, SPI_NAND_FEA_ADDR_CONF_B0, &secur_reg);
++	if (ret != 0) {
++		LOG_ERR("get feature failed: %d", ret);
++		goto out;
++	}
++
++	if (!(secur_reg & SPINAND_SECURE_BIT_CONT)) {
++		LOG_ERR("Enable continuous read failed: %d\n", secur_reg);
++	}
++
++out:
++	release_device(dev);
++	return ret;
++}
++
++static int spi_nand_read_cont(const struct device *dev, off_t addr, void *dest,
++			size_t size)
++{
++	struct spi_nand_data *data = dev->data;
++	int ret = 0;
++
++	acquire_device(dev);
++
++	ret = spi_nand_access(dev, SPI_NAND_CMD_PAGE_READ,
++		NAND_ACCESS_ADDRESSED | NAND_ACCESS_24BIT_ADDR,
++		addr >> data->page_shift, NULL, 0);
++	if (ret != 0) {
++		LOG_ERR("page read failed: %d", ret);
++		goto out;
++	}
++
++	ret = spi_nand_wait_until_ready(dev);
++	if (ret != 0) {
++		LOG_ERR("wait ready failed: %d", ret);
++		goto out;
++	}
++
++	ret = spi_nand_access(dev, SPI_NAND_CMD_READ_CACHE,
++		NAND_ACCESS_ADDRESSED | NAND_ACCESS_24BIT_ADDR,
++		((addr >> data->page_shift) & SPI_NAND_PAGE_MASK), dest, size);
++	if (ret != 0) {
++		LOG_ERR("read from cache failed: %d", ret);
++		goto out;
++	}
++
++	ret = spi_nand_conti_read_enable(dev, false);
++
++out:
++	release_device(dev);
++
++	return ret;
++}
++
++static int spi_nand_read_normal(const struct device *dev,
++				off_t addr, void *dest, size_t size)
++{
++	struct spi_nand_data *data = dev->data;
++	int ret = 0;
++	uint32_t offset = 0;
++	uint32_t chunk = 0;
++
++	acquire_device(dev);
++
++	while (size > 0) {
++		/* Read on _page_size_bytes boundaries (Default 2048 bytes a page) */
++		offset = addr % data->page_size;
++		chunk = (offset + size < data->page_size) ?
++			size : (data->page_size - offset);
++		ret = spi_nand_access(dev, SPI_NAND_CMD_PAGE_READ,
++			NAND_ACCESS_ADDRESSED | NAND_ACCESS_24BIT_ADDR,
++			addr >> data->page_shift, NULL, 0);
++		if (ret != 0) {
++			LOG_ERR("page read failed: %d", ret);
++			goto out;
++		}
++
++		ret = spi_nand_wait_until_ready(dev);
++		if (ret != 0) {
++			LOG_ERR("wait ready failed: %d", ret);
++			goto out;
++		}
++
++		ret = spi_nand_access(dev, SPI_NAND_CMD_READ_CACHE,
++			NAND_ACCESS_ADDRESSED | NAND_ACCESS_16BIT_ADDR | NAND_ACCESS_DUMMY,
++			(addr & SPI_NAND_PAGE_MASK), dest, chunk);
++		if (ret != 0) {
++			LOG_ERR("read from cache failed: %d", ret);
++			goto out;
++		}
++
++		dest = (uint8_t *)dest + chunk;
++
++		addr = (addr + SPI_NAND_PAGE_OFFSET) & (~SPI_NAND_PAGE_MASK);
++		size -= chunk;
++	}
++
++out:
++	release_device(dev);
++
++	return ret;
++}
++
++static int spi_nand_read_software_ecc(const struct device *dev,
++			off_t addr, void *dest, size_t size)
++{
++	struct spi_nand_data *data = dev->data;
++	int ret = 0;
++	uint32_t offset = 0;
++	uint32_t chunk = 0;
++	uint8_t ecc_steps = data->ecc.ecc_steps;
++	uint8_t *p = (uint8_t *)data->page_buf;
++
++	acquire_device(dev);
++	while (size > 0) {
++		/* Read on _page_size_bytes boundaries (Default 2048 bytes a page) */
++		offset = addr % data->page_size;
++		chunk = (offset + size < data->page_size) ?
++			size : (data->page_size - offset);
++
++		ret = spi_nand_access(dev, SPI_NAND_CMD_PAGE_READ,
++			NAND_ACCESS_ADDRESSED | NAND_ACCESS_24BIT_ADDR,
++			addr >> data->page_shift, NULL, 0);
++		if (ret != 0) {
++			LOG_ERR("page read failed: %d", ret);
++			goto out;
++		}
++
++		ret = spi_nand_wait_until_ready(dev);
++		if (ret != 0) {
++			LOG_ERR("wait ready failed: %d", ret);
++			goto out;
++		}
++
++		ret = spi_nand_access(dev, SPI_NAND_CMD_READ_CACHE,
++			NAND_ACCESS_ADDRESSED | NAND_ACCESS_16BIT_ADDR | NAND_ACCESS_DUMMY,
++			(addr & SPI_NAND_PAGE_MASK), data->page_buf,
++			data->page_size + data->oob_size);
++		if (ret != 0) {
++			LOG_ERR("read from cache failed: %d", ret);
++			goto out;
++		}
++
++		memcpy(data->ecc.ecc_code, data->page_buf + data->page_size +
++			data->ecc.ecc_layout_pos, data->ecc.ecc_bytes * data->ecc.ecc_steps);
++
++		p = (uint8_t *)data->page_buf;
++		ecc_steps = data->ecc.ecc_steps;
++		for (uint8_t i = 0 ; ecc_steps; ecc_steps--, i += data->ecc.ecc_bytes,
++			p += data->ecc.ecc_size) {
++			memset(data->nbc.bch->input_data, 0x0, (1 << data->nbc.bch->m) / 8);
++			memcpy(data->nbc.bch->input_data + data->ecc.ecc_bytes, p,
++				data->ecc.ecc_size);
++
++			int ret = bch_decode(data->nbc.bch, data->nbc.bch->input_data,
++				(unsigned int *)(data->ecc.ecc_code + i));
++
++			if (ret < 0) {
++				LOG_ERR("Reading data failed");
++				goto out;
++			}
++			memcpy(p, data->nbc.bch->input_data + data->ecc.ecc_bytes,
++				data->ecc.ecc_size);
++		}
++
++		memcpy(dest, data->page_buf + offset, chunk);
++
++		dest = (uint8_t *)dest + chunk;
++
++		addr = (addr + SPI_NAND_PAGE_OFFSET) & (~SPI_NAND_PAGE_MASK);
++		size -= chunk;
++	}
++
++out:
++	release_device(dev);
++	return ret;
++}
++
++static int spi_nand_read(const struct device *dev, off_t addr, void *dest,
++			size_t size)
++{
++	int ret = 0;
++	struct spi_nand_data *data = dev->data;
++
++	if (data->ecc.ecc_bits == 0) {
++		if (data->continuous_read) {
++			ret = spi_nand_read_cont(dev, addr, dest, size);
++		} else {
++			ret = spi_nand_read_normal(dev, addr, dest, size);
++		}
++	} else {
++		ret = spi_nand_read_software_ecc(dev, addr, dest, size);
++	}
++
++	return ret;
++}
++
++static int spi_nand_write(const struct device *dev, off_t addr,
++			 const void *src,
++			 size_t size)
++{
++	struct spi_nand_data *data = dev->data;
++	int ret = 0;
++	uint32_t offset = 0;
++	uint32_t chunk = 0;
++	uint32_t written_bytes = 0;
++	const struct spi_nand_config *const driver_cfg = dev->config;
++
++	/* address must be sub-page-aligned */
++	if (addr & (driver_cfg->sub_page_size - 1)) {
++		return -EINVAL;
++	}
++
++	/* size must be a multiple of sub-page */
++	if ((size % driver_cfg->sub_page_size) != 0) {
++		return -EINVAL;
++	}
++
++	acquire_device(dev);
++
++	while (size > 0) {
++
++		/* Don't write more than a page. */
++		offset = addr % data->page_size;
++		chunk = (offset + size < data->page_size) ? size : (data->page_size - offset);
++		written_bytes = chunk;
++
++		spi_nand_cmd_write(dev, SPI_NAND_CMD_WREN);
++
++		if (data->ecc.ecc_bits == 0) {
++			ret = spi_nand_access(dev, SPI_NAND_CMD_PP_LOAD,
++				NAND_ACCESS_WRITE | NAND_ACCESS_ADDRESSED | NAND_ACCESS_16BIT_ADDR,
++				(addr & SPI_NAND_PAGE_MASK), (void *)src, written_bytes);
++			if (ret != 0) {
++				LOG_ERR("program load failed: %d", ret);
++				goto out;
++			}
++		} else {
++			uint8_t *p = (uint8_t *)data->page_buf;
++			uint8_t ecc_steps = data->ecc.ecc_steps;
++
++			if (size < data->page_size) {
++				LOG_ERR("Write failed");
++				ret = -EINVAL;
++				goto out;
++
++			}
++
++			/* prepare data */
++			memset(data->page_buf, 0xff, data->page_size + data->oob_size);
++			memcpy(data->page_buf + offset, (uint8_t *)src, written_bytes);
++
++			/* calculate the software ECC */
++			for (uint8_t i = 0; ecc_steps; ecc_steps--, i += data->ecc.ecc_bytes,
++				p += data->ecc.ecc_size) {
++				memset(data->nbc.bch->input_data, 0x0, (1 << data->nbc.bch->m) / 8);
++				memcpy(data->nbc.bch->input_data + data->ecc.ecc_bytes, p,
++					data->ecc.ecc_size);
++				bch_calculate_ecc(dev, data->nbc.bch->input_data,
++					data->ecc.ecc_calc + i);
++			}
++
++			/* prepare ECC code */
++			memcpy(data->page_buf + data->page_size + data->ecc.ecc_layout_pos,
++				data->ecc.ecc_calc, data->ecc.ecc_bytes * data->ecc.ecc_steps);
++
++			written_bytes = data->page_size + data->oob_size;
++			ret = spi_nand_access(dev, SPI_NAND_CMD_PP_LOAD,
++				NAND_ACCESS_WRITE | NAND_ACCESS_ADDRESSED | NAND_ACCESS_16BIT_ADDR,
++				(addr & SPI_NAND_PAGE_MASK), (void *)data->page_buf, written_bytes);
++			if (ret != 0) {
++				LOG_ERR("program load failed: %d", ret);
++				goto out;
++			}
++		}
++
++		ret = spi_nand_access(dev, SPI_NAND_CMD_PROGRAM_EXEC,
++			NAND_ACCESS_WRITE | NAND_ACCESS_ADDRESSED | NAND_ACCESS_24BIT_ADDR,
++			addr >> data->page_shift, NULL, 0);
++		if (ret != 0) {
++			LOG_ERR("program excute failed: %d", ret);
++			goto out;
++		}
++
++		src = (const uint8_t *)(src) + chunk;
++		addr = (addr + SPI_NAND_PAGE_OFFSET) & (~SPI_NAND_PAGE_MASK);
++		size -= chunk;
++
++		ret = spi_nand_wait_until_ready(dev);
++		if (ret != 0) {
++			LOG_ERR("wait ready failed: %d", ret);
++			goto out;
++		}
++	}
++
++out:
++	release_device(dev);
++	return ret;
++}
++
++static int spi_nand_erase(const struct device *dev, off_t addr, size_t size)
++{
++	struct spi_nand_data *data = dev->data;
++	int ret = 0;
++
++	/* address must be block-aligned */
++	if (!(addr & SPI_NAND_BLOCK_MASK) && (addr != 0)) {
++		return -EINVAL;
++	}
++
++	/* size must be a multiple of blocks */
++	if ((size % data->block_size) != 0) {
++		return -EINVAL;
++	}
++
++	acquire_device(dev);
++
++	while ((size > 0) && (ret == 0)) {
++		spi_nand_cmd_write(dev, SPI_NAND_CMD_WREN);
++
++		ret = spi_nand_access(dev, SPI_NAND_CMD_BE,
++			NAND_ACCESS_ADDRESSED | NAND_ACCESS_24BIT_ADDR,
++			addr >> data->page_shift, NULL, 0);
++		if (ret != 0) {
++			LOG_ERR("erase failed: %d", ret);
++			goto out;
++		}
++
++		addr += SPI_NAND_BLOCK_OFFSET;
++		size -= data->block_size;
++
++		ret = spi_nand_wait_until_ready(dev);
++		if (ret != 0) {
++			LOG_ERR("wait ready failed: %d", ret);
++			goto out;
++		}
++	}
++
++out:
++	release_device(dev);
++	return ret;
++}
++
++static int spi_nand_check_id(const struct device *dev)
++{
++	const struct spi_nand_config *cfg = dev->config;
++	uint8_t const *expected_id = cfg->id;
++	uint8_t read_id[SPI_NAND_ID_LEN];
++
++	if (read_id == NULL) {
++		return -EINVAL;
++	}
++
++	acquire_device(dev);
++
++	int ret = spi_nand_access(dev, SPI_NAND_CMD_RDID, NAND_ACCESS_DUMMY,
++			0, read_id, SPI_NAND_ID_LEN);
++
++	release_device(dev);
++
++	if (memcmp(expected_id, read_id, sizeof(read_id)) != 0) {
++		LOG_ERR("Wrong ID: %02X %02X , "
++			"expected: %02X %02X ",
++			read_id[0], read_id[1],
++			expected_id[0], expected_id[1]);
++		return -ENODEV;
++	}
++
++	return ret;
++}
++
++void bch_ecc_init(const struct device *dev, uint8_t ecc_bits)
++{
++	struct spi_nand_data *data = dev->data;
++	unsigned int m, t, i;
++	unsigned char *erased_page;
++	unsigned int eccsize = 410;
++	unsigned int eccbytes = 0;
++
++	m = find_last_set(1 + 8 * eccsize);
++	t = ecc_bits;
++
++	data->ecc.ecc_bytes = eccbytes = ((m * t + 31) / 32) * 4;
++	data->ecc.ecc_size = eccsize;
++	data->ecc.ecc_steps = data->page_size / eccsize;
++	data->ecc.ecc_layout_pos = 2; /* skip the bad block mark for Macronix spi nand */
++
++	data->nbc.bch = bch_init(m, t);
++	if (!data->nbc.bch) {
++		return;
++	}
++
++	/* verify that eccbytes has the expected value */
++	if (data->nbc.bch->ecc_words * 4 != eccbytes) {
++		LOG_ERR("invalid eccbytes %u, should be %u\n",
++			eccbytes, data->nbc.bch->ecc_words);
++		return;
++	}
++
++	data->page_buf = (uint8_t *)k_malloc(data->page_size + data->oob_size);
++	if (data->page_buf == NULL) {
++		LOG_ERR("Not enougn heap\n");
++	}
++	data->ecc.ecc_calc = (uint8_t *)k_malloc(data->ecc.ecc_steps * data->ecc.ecc_bytes);
++	if (data->ecc.ecc_calc == NULL) {
++		LOG_ERR("Not enougn heap\n");
++	}
++	data->ecc.ecc_code = (uint8_t *)k_malloc(data->ecc.ecc_steps * data->ecc.ecc_bytes);
++	if (data->ecc.ecc_code == NULL) {
++		LOG_ERR("Not enougn heap\n");
++	}
++	data->nbc.eccmask = (unsigned char *)k_malloc(eccbytes);
++
++	data->nbc.errloc = (unsigned int *)k_malloc(t * sizeof(*data->nbc.errloc));
++	if (!data->nbc.eccmask || !data->nbc.errloc) {
++		LOG_ERR("Not enougn heap\n");
++		return;
++	}
++	/*
++	 * compute and store the inverted ecc of an erased ecc block
++	 */
++	erased_page = (unsigned char *)k_malloc(eccsize);
++	if (!erased_page) {
++		return;
++	}
++	memset(data->page_buf, 0xff, data->page_size + data->oob_size);
++	memset(erased_page, 0xff, eccsize);
++	memset(data->nbc.eccmask, 0, eccbytes);
++	bch_encode(data->nbc.bch, erased_page, (unsigned int *)data->nbc.eccmask);
++	k_free(erased_page);
++
++	for (i = 0; i < eccbytes; i++) {
++		data->nbc.eccmask[i] ^= 0xff;
++	}
++}
++
++void bch_ecc_free(const struct device *dev)
++{
++	struct spi_nand_data *data = dev->data;
++
++	bch_free(data->nbc.bch);
++	k_free(data->nbc.errloc);
++	k_free(data->nbc.eccmask);
++	k_free(data->page_buf);
++	k_free(data->ecc.ecc_calc);
++	k_free(data->ecc.ecc_code);
++}
++
++static int spi_nand_read_otp_onfi(const struct device *dev)
++{
++	int ret;
++	uint8_t secur_reg = 0, onfi_table[256];
++	struct spi_nand_data *data = dev->data;
++
++	data->page_shift = 12;
++	data->page_size = 2048;
++
++	acquire_device(dev);
++	ret = spi_nand_get_feature(dev, SPI_NAND_FEA_ADDR_CONF_B0, &secur_reg);
++	if (ret != 0) {
++		LOG_ERR("get feature failed: %d", ret);
++		goto out0;
++	}
++	secur_reg |= SPINAND_SECURE_BIT_OTP_EN;
++	ret = spi_nand_set_feature(dev, SPI_NAND_FEA_ADDR_CONF_B0, secur_reg);
++	if (ret != 0) {
++		LOG_ERR("set feature failed: %d", ret);
++		goto out0;
++	}
++	ret = spi_nand_get_feature(dev, SPI_NAND_FEA_ADDR_CONF_B0, &secur_reg);
++	if (ret != 0) {
++		LOG_ERR("get feature failed: %d", ret);
++		goto out0;
++	}
++	if (!(secur_reg & SPINAND_SECURE_BIT_OTP_EN)) {
++		LOG_ERR("Enable OTP failed: %d\n", secur_reg);
++		ret = -EINVAL;
++	}
++
++out0:
++	release_device(dev);
++	if (ret != 0) {
++		return ret;
++	}
++
++	ret = spi_nand_read(dev, 1 << data->page_shift, onfi_table, sizeof(onfi_table));
++	if (ret != 0) {
++		LOG_ERR("read onfi table failed: %d", ret);
++		return ret;
++	}
++
++	if (onfi_table[0] == 'O' && onfi_table[1] == 'N'
++		&& onfi_table[2] == 'F' && onfi_table[3] == 'I') {
++		LOG_ERR("ONFI table found\n");
++		data->page_size = onfi_table[80] + (onfi_table[81] << 8) + (onfi_table[82] << 16);
++		data->oob_size = onfi_table[84] + (onfi_table[85] << 8);
++		data->block_num = onfi_table[96] + (onfi_table[97] << 8);
++		data->block_size = data->page_size * data->page_num;
++		switch (data->page_size) {
++		case 2048:
++			data->page_shift = 12;
++		break;
++		case 4096:
++			data->page_shift = 13;
++		break;
++		}
++		switch (data->page_num) {
++		case 64:
++			data->block_shift = data->page_shift + 6;
++		break;
++		case 128:
++			data->block_shift = data->page_shift + 7;
++		break;
++		case 256:
++			data->block_shift = data->page_shift + 8;
++		break;
++		}
++		data->flash_size = data->block_size * data->block_num;
++		data->ecc.ecc_bits = onfi_table[112];
++
++		if (data->ecc.ecc_bits > 0) {
++			bch_ecc_init(dev, data->ecc.ecc_bits);
++		} else {
++			acquire_device(dev);
++
++			secur_reg |= SPINAND_SECURE_BIT_ECC_EN;
++			ret = spi_nand_set_feature(dev,
++				SPI_NAND_FEA_ADDR_CONF_B0, secur_reg);
++			if (ret != 0) {
++				LOG_ERR("set feature failed: %d", ret);
++				goto out1;
++			}
++
++			release_device(dev);
++		}
++
++		if (onfi_table[167] & 0x01) {
++			data->read_recovery = true;
++		} else {
++			data->read_recovery = false;
++		}
++
++		if (onfi_table[168] & 0x02) {
++			data->continuous_read = true;
++
++			ret = spi_nand_conti_read_enable(dev, true);
++			if (ret != 0) {
++				LOG_ERR("SPI NAND Set continuous read enable Failed: %d", ret);
++				return ret;
++			}
++		} else {
++			data->continuous_read = false;
++		}
++	} else {
++		LOG_ERR("ONFI table not found");
++		return 0;
++	}
++
++	acquire_device(dev);
++
++	ret = spi_nand_get_feature(dev, SPI_NAND_FEA_ADDR_CONF_B0, &secur_reg);
++	if (ret != 0) {
++		LOG_ERR("get feature failed: %d", ret);
++		goto out1;
++	}
++
++	secur_reg &= ~SPINAND_SECURE_BIT_OTP_EN;
++	ret = spi_nand_set_feature(dev, SPI_NAND_FEA_ADDR_CONF_B0, secur_reg);
++	if (ret != 0) {
++		LOG_ERR("set feature failed: %d", ret);
++		goto out1;
++	}
++
++	ret = spi_nand_get_feature(dev, SPI_NAND_FEA_ADDR_CONF_B0, &secur_reg);
++	if (ret != 0) {
++		LOG_ERR("get feature failed: %d", ret);
++		goto out1;
++	}
++
++	if (secur_reg & SPINAND_SECURE_BIT_OTP_EN) {
++		LOG_ERR("Disable OTP failed: %d\n", secur_reg);
++		ret = -EINVAL;
++	}
++
++out1:
++	release_device(dev);
++	return ret;
++}
++
++/**
++ * @brief Configure the flash
++ *
++ * @param dev The flash device structure
++ * @param info The flash info structure
++ * @return 0 on success, negative errno code otherwise
++ */
++static int spi_nand_configure(const struct device *dev)
++{
++	const struct spi_nand_config *cfg = dev->config;
++
++	uint8_t reg = 0;
++	int rc;
++
++	/* Validate bus and CS is ready */
++	if (!spi_is_ready_dt(&cfg->spi)) {
++		return -ENODEV;
++	}
++
++	rc = spi_nand_check_id(dev);
++	if (rc != 0) {
++		LOG_ERR("Check ID failed: ");
++		return -ENODEV;
++	}
++
++	/* Check for block protect bits that need to be cleared. */
++	acquire_device(dev);
++
++	rc = spi_nand_get_feature(dev, SPI_NAND_FEA_ADDR_BLOCK_PROT, &reg);
++
++	if (rc != 0) {
++		LOG_ERR("get feature failed: %d", rc);
++		goto out;
++	}
++
++	/* Only clear if GET_FEATURE worked and something's set. */
++	if (reg & SPINAND_BLOCK_PROT_BIT_BP_MASK) {
++		reg = 0;
++		rc = spi_nand_set_feature(dev, SPI_NAND_FEA_ADDR_BLOCK_PROT, reg);
++		if (rc != 0) {
++			LOG_ERR("set feature failed: %d", rc);
++		}
++	}
++
++out:
++	release_device(dev);
++
++	if (rc != 0) {
++		return rc;
++	}
++
++	rc = spi_nand_read_otp_onfi(dev);
++	if (rc != 0) {
++		LOG_ERR("SFDP read failed: %d", rc);
++		return -ENODEV;
++	}
++
++	return 0;
++}
++
++/**
++ * @brief Initialize and configure the flash
++ *
++ * @param name The flash name
++ * @return 0 on success, negative errno code otherwise
++ */
++static int spi_nand_init(const struct device *dev)
++{
++	if (IS_ENABLED(CONFIG_MULTITHREADING)) {
++		struct spi_nand_data *const driver_data = dev->data;
++
++		k_sem_init(&driver_data->sem, 1, K_SEM_MAX_LIMIT);
++	}
++
++	return spi_nand_configure(dev);
++}
++
++static const struct flash_parameters flash_nand_parameters = {
++	.write_block_size = DT_INST_PROP(0, cs_wait_delay),
++	.erase_value = 0xff,
++};
++
++static  struct flash_parameters *
++flash_nand_get_parameters( struct device *dev)
++{
++	// ARG_UNUSED(dev);
++	// struct spi_nand_data *data = dev->data;
++	// struct flash_parameters *flash_nand_parameters;
++
++	// flash_nand_parameters->write_block_size = SPI_NAND_SUB_PAGE_SIZE;
++	// flash_nand_parameters->erase_value = 0xff;
++
++	// return flash_nand_parameters;
++}
++
++static const struct flash_driver_api spi_nand_api = {
++	.read = spi_nand_read,
++	.write = spi_nand_write,
++	.erase = spi_nand_erase,
++	.get_parameters = flash_nand_get_parameters,
++};
++
++static const struct spi_nand_config spi_nand_config_0 = {
++	.spi = SPI_DT_SPEC_INST_GET(0, SPI_WORD_SET(8),
++				    DT_INST_PROP(0, cs_wait_delay)),
++	.id = DT_INST_PROP(0, id),
++	.support_conti_read = DT_INST_PROP(0, support_conti_read),
++};
++
++static struct spi_nand_data spi_nand_data_0;
++
++DEVICE_DT_INST_DEFINE(0, &spi_nand_init, NULL,
++		 &spi_nand_data_0, &spi_nand_config_0,
++		 POST_KERNEL, CONFIG_SPI_NAND_INIT_PRIORITY,
++		 &spi_nand_api);
+diff --git a/drivers/flash/spi_nand.h b/drivers/flash/spi_nand.h
+new file mode 100644
+index 00000000000..5ccc6a37ec4
+--- /dev/null
++++ b/drivers/flash/spi_nand.h
+@@ -0,0 +1,95 @@
++/*
++ * Copyright (c) 2022-2025 Macronix International Co., Ltd.
++ *
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++#ifndef __SPI_NAND_H__
++#define __SPI_NAND_H__
++
++#include <zephyr/sys/util.h>
++#include <zephyr/sys/byteorder.h>
++
++#define SPI_NAND_ID_LEN	2
++
++/* Status register bits */
++#define SPI_NAND_WIP_BIT         BIT(0)  /* Write in progress */
++#define SPI_NAND_WEL_BIT         BIT(1)  /* Write enable latch */
++
++/* Get/Set Feature Address Definition */
++#define SPI_NAND_FEA_ADDR_BLOCK_PROT 0xA0
++#define SPI_NAND_FEA_ADDR_CONF_B0    0xB0
++#define SPI_NAND_FEA_ADDR_STATUS     0xC0
++#define SPI_NAND_FEA_ADDR_RECOVERY   0x70
++
++/* Status Register Bits 0xC0 */
++#define SPINAND_STATUS_BIT_WIP             0x1  /* Write In Progress */
++#define SPINAND_STATUS_BIT_WEL             0x2  /* Write Enable Latch */
++#define SPINAND_STATUS_BIT_ERASE_FAIL      0x4  /* Erase failed */
++#define SPINAND_STATUS_BIT_PROGRAM_FAIL    0x8  /* Program failed */
++#define SPINAND_STATUS_BIT_ECC_STATUS_MASK 0x30 /* ECC status */
++#define SPINAND_STATUS_ECC_STATUS_NO_ERR     0x00
++#define SPINAND_STATUS_ECC_STATUS_ERR_COR    0x10
++#define SPINAND_STATUS_ECC_STATUS_ERR_NO_COR 0x20
++
++/* Secure OTP Register Bits  0xB0 */
++#define SPINAND_SECURE_BIT_QE          0x01  /* Quad enable */
++#define SPINAND_SECURE_BIT_CONT        0x04  /* continuous read enable */
++#define SPINAND_SECURE_BIT_ECC_EN      0x10  /* On-die ECC enable */
++#define SPINAND_SECURE_BIT_OTP_EN      0x40
++#define SPINAND_SECURE_BIT_OTP_PROT    0x80
++
++/* Block Protection Register Bits 0xA0*/
++#define  SPINAND_BLOCK_PROT_BIT_SP      0x01
++#define  SPINAND_BLOCK_PROT_BIT_COMPLE  0x02
++#define  SPINAND_BLOCK_PROT_BIT_INVERT  0x04
++#define  SPINAND_BLOCK_PROT_BIT_BP0     0x08
++#define  SPINAND_BLOCK_PROT_BIT_BP1     0x10
++#define  SPINAND_BLOCK_PROT_BIT_BP2     0x20
++#define  SPINAND_BLOCK_PROT_BIT_BPRWD   0x80
++#define  SPINAND_BLOCK_PROT_BIT_BP_MASK 0x38
++
++#define  SPINAND_BLOCK_PROT_BP_OFFSET     3
++#define  SPINAND_BLOCK_PROT_COMPLE_OFFSET 1
++
++/* Special read for data recovery 0x70 */
++#define  SPINAND_RECOVERY_DISABLE      0x00
++#define  SPINAND_RECOVERY_MODE1        0x01
++#define  SPINAND_RECOVERY_MODE2        0x02
++#define  SPINAND_RECOVERY_MODE3        0x03
++#define  SPINAND_RECOVERY_MODE4        0x04
++#define  SPINAND_RECOVERY_MODE5        0x05
++
++/* Flash opcodes */
++#define SPI_NAND_CMD_RDSR            0x05    /* Read status register */
++#define SPI_NAND_CMD_RDID            0x9F    /* Read ID */
++
++#define SPI_NAND_CMD_PAGE_READ       0x13   /* Read data from array to cache */
++#define SPI_NAND_CMD_READ_CACHE      0x03   /* Read data from cache*/
++#define SPI_NAND_CMD_READ_CACHE2     0x3B
++#define SPI_NAND_CMD_READ_CACHE4     0x6B
++#define SPI_NAND_CMD_READ_CACHE_SEQ  0x31
++#define SPI_NAND_CMD_READ_CACHE_END  0x3F
++
++#define SPI_NAND_CMD_WREN            0x06    /* Write enable */
++#define SPI_NAND_CMD_WRDI            0x04    /* Write disable */
++#define SPI_NAND_CMD_PP_LOAD         0x02    /* Load data to cache*/
++#define SPI_NAND_CMD_PP_RAND_LOAD    0x84    /* Load random data to cache */
++#define SPI_NAND_CMD_4PP_LOAD        0x32    /* Load data to cache with 4 IO*/
++#define SPI_NAND_CMD_4PP_RAND_LOAD   0x34    /* Load random data to cache with 4 IO*/
++#define SPI_NAND_CMD_PROGRAM_EXEC    0x10    /* Execute program */
++#define SPI_NAND_CMD_BE              0xD8    /* Block erase */
++
++#define SPI_NAND_CMD_GET_FEATURE     0x0F
++#define SPI_NAND_CMD_SET_FEATURE     0x1F
++#define SPI_NAND_CMD_RESET           0xFF
++#define SPI_NAND_CMD_ECC_STAT_READ   0x7C
++
++#define SPI_NAND_BLOCK_OFFSET  0x40000
++#define SPI_NAND_PAGE_OFFSET   0x1000
++#define SPI_NAND_BLOCK_MASK    0x3FFFF
++#define SPI_NAND_PAGE_MASK     0xFFF
++
++#define SPI_NAND_SUB_PAGE_SIZE     DT_INST_PROP(0, cs_wait_delay)
++
++#endif /*__SPI_NAND_H__*/
+diff --git a/drivers/flash/spi_nor.c b/drivers/flash/spi_nor.c
+index c02e77bf9a6..fe23396d945 100644
+--- a/drivers/flash/spi_nor.c
++++ b/drivers/flash/spi_nor.c
+@@ -1438,11 +1438,13 @@ static int spi_nor_configure(const struct device *dev)
+ 	const struct spi_nor_config *cfg = dev->config;
+ 	uint8_t jedec_id[SPI_NOR_MAX_ID_LEN];
+ 	int rc;
++	printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
+ 
+ 	/* Validate bus and CS is ready */
+ 	if (!spi_is_ready_dt(&cfg->spi)) {
+ 		return -ENODEV;
+ 	}
++	printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
+ 
+ #if ANY_INST_HAS_RESET_GPIOS
+ 
+@@ -1466,6 +1468,7 @@ static int spi_nor_configure(const struct device *dev)
+ 	 * Exit DPD and wait until flash is ready.
+ 	 */
+ 	acquire_device(dev);
++	printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
+ 
+ 	rc = exit_dpd(dev);
+ 	if (rc < 0) {
+@@ -1473,12 +1476,15 @@ static int spi_nor_configure(const struct device *dev)
+ 		release_device(dev);
+ 		return -ENODEV;
+ 	}
++	printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
+ 
+ 	rc = spi_nor_rdsr(dev);
+ 	if (rc > 0 && (rc & SPI_NOR_WIP_BIT)) {
+ 		LOG_WRN("Waiting until flash is ready");
+ 		rc = spi_nor_wait_until_ready(dev, WAIT_READY_REGISTER);
+ 	}
++		printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
++
+ 	release_device(dev);
+ 	if (rc < 0) {
+ 		LOG_ERR("Failed to wait until flash is ready (%d)", rc);
+@@ -1490,6 +1496,8 @@ static int spi_nor_configure(const struct device *dev)
+ 	 */
+ 
+ 	rc = spi_nor_read_jedec_id(dev, jedec_id);
++
++	// udelay ();
+ 	if (rc != 0) {
+ 		LOG_ERR("JEDEC ID read failed: %d", rc);
+ 		return -ENODEV;
+@@ -1577,6 +1585,7 @@ static int spi_nor_configure(const struct device *dev)
+ static int spi_nor_pm_control(const struct device *dev, enum pm_device_action action)
+ {
+ 	int rc = 0;
++	printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
+ 
+ 	switch (action) {
+ 	case PM_DEVICE_ACTION_SUSPEND:
+@@ -1591,21 +1600,32 @@ static int spi_nor_pm_control(const struct device *dev, enum pm_device_action ac
+ 		break;
+ 	case PM_DEVICE_ACTION_TURN_ON:
+ 		/* Coming out of power off */
++			printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
++
+ 		rc = spi_nor_configure(dev);
++	printf ("***[%s], [%s], [%04d], rc value is %d\r\n", __FILE__, __func__, __LINE__, rc);
++
+ 		if (rc == 0) {
+ 			/* Move to DPD, the correct device state
+ 			 * for PM_DEVICE_STATE_SUSPENDED
+ 			 */
++	printf ("***[%s], [%s], [%04d], rc value is %d\r\n", __FILE__, __func__, __LINE__, rc);
++
+ 			acquire_device(dev);
+ 			rc = enter_dpd(dev);
++	printf ("***[%s], [%s], [%04d], rc value is %d\r\n", __FILE__, __func__, __LINE__, rc);
++
+ 			release_device(dev);
+ 		}
++	printf ("***[%s], [%s], [%04d], rc value is %d\r\n", __FILE__, __func__, __LINE__, rc);
++
+ 		break;
+ 	case PM_DEVICE_ACTION_TURN_OFF:
+ 		break;
+ 	default:
+ 		rc = -ENOSYS;
+ 	}
++	printf ("***[%s], [%s], [%04d], rc value is %d\r\n", __FILE__, __func__, __LINE__, rc);
+ 
+ 	return rc;
+ }
+@@ -1618,12 +1638,13 @@ static int spi_nor_pm_control(const struct device *dev, enum pm_device_action ac
+  */
+ static int spi_nor_init(const struct device *dev)
+ {
++	printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
+ 	if (IS_ENABLED(CONFIG_MULTITHREADING)) {
+ 		struct spi_nor_data *const driver_data = dev->data;
+ 
+ 		k_sem_init(&driver_data->sem, 1, K_SEM_MAX_LIMIT);
+ 	}
+-
++	printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
+ #if ANY_INST_HAS_WP_GPIOS
+ 	if (DEV_CFG(dev)->wp_gpios_exist) {
+ 		if (!device_is_ready(DEV_CFG(dev)->wp.port)) {
+@@ -1648,7 +1669,7 @@ static int spi_nor_init(const struct device *dev)
+ 		}
+ 	}
+ #endif /* ANY_INST_HAS_HOLD_GPIOS */
+-
++	printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
+ 	return pm_device_driver_init(dev, spi_nor_pm_control);
+ }
+ 
+diff --git a/drivers/mspi/CMakeLists.txt b/drivers/mspi/CMakeLists.txt
+index 7f0a98ddb3b..c4124a629af 100644
+--- a/drivers/mspi/CMakeLists.txt
++++ b/drivers/mspi/CMakeLists.txt
+@@ -7,3 +7,4 @@ zephyr_library_sources_ifdef(CONFIG_MSPI_AMBIQ_AP3   mspi_ambiq_ap3.c)
+ zephyr_library_sources_ifdef(CONFIG_MSPI_AMBIQ_AP5   mspi_ambiq_ap5.c)
+ zephyr_library_sources_ifdef(CONFIG_MSPI_DW          mspi_dw.c)
+ zephyr_library_sources_ifdef(CONFIG_MSPI_EMUL        mspi_emul.c)
++zephyr_library_sources_ifdef(CONFIG_MSPI_XLNX        mspi_mxic_uefc.c)
+diff --git a/drivers/mspi/Kconfig b/drivers/mspi/Kconfig
+index 269d8d16f04..4e24e8a3b65 100644
+--- a/drivers/mspi/Kconfig
++++ b/drivers/mspi/Kconfig
+@@ -58,9 +58,10 @@ config MSPI_TIMING
+ module = MSPI
+ module-str = mspi
+ source "subsys/logging/Kconfig.template.log_config"
+-
+ source "drivers/mspi/Kconfig.ambiq"
+ source "drivers/mspi/Kconfig.dw"
+ source "drivers/mspi/Kconfig.mspi_emul"
++source "drivers/mspi/Kconfig.xlnx"
++
+ 
+ endif # MSPI
+diff --git a/drivers/mspi/Kconfig.xlnx b/drivers/mspi/Kconfig.xlnx
+new file mode 100644
+index 00000000000..89a0e959489
+--- /dev/null
++++ b/drivers/mspi/Kconfig.xlnx
+@@ -0,0 +1,7 @@
++# Copyright (c) 2024 Nordic Semiconductor ASA
++# SPDX-License-Identifier: Apache-2.0
++
++config MSPI_XLNX
++	bool "DesignWare SSI controller driver"
++	default y
++
+diff --git a/drivers/mspi/mspi_mxic_uefc.c b/drivers/mspi/mspi_mxic_uefc.c
+new file mode 100644
+index 00000000000..f0218c7a0cb
+--- /dev/null
++++ b/drivers/mspi/mspi_mxic_uefc.c
+@@ -0,0 +1,578 @@
++/*
++ * Copyright (c) 2024, Ambiq Micro Inc. <www.ambiq.com>
++ *
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++#define DT_DRV_COMPAT xlnx_mspi_controller
++
++#include "mspi_mxic_uefc.h"
++LOG_MODULE_REGISTER(xlnx_mspi_controller);
++
++static uint32_t mxic_uefc_conf(const struct device *dev);
++static int mxic_uefc_hc_setup(const struct device *dev);
++static int mxic_uefc_poll_hc_reg(const struct device *dev, uint32_t reg, uint32_t mask);
++static int mxic_uefc_io_mode_xfer(const struct device *dev, void *tx, void *rx, uint32_t len, uint8_t is_data);
++static int mxic_uefc_init(const struct device *dev);
++static void mxic_uefc_cs_start(const struct device *dev);
++static int mspi_mxic_config(const struct mspi_dt_spec *spec);
++
++struct mspi_mxic_config {
++	DEVICE_MMIO_ROM;
++};
++
++struct mspi_mxic_data {
++	DEVICE_MMIO_RAM;
++
++	struct mspi_dev_id              *dev_id;
++	struct k_mutex                  lock;
++
++	struct mspi_dev_cfg             dev_cfg;
++	struct mspi_xip_cfg             xip_cfg;
++	struct mspi_scramble_cfg        scramble_cfg;
++	uint8_t data_buswidth;
++	bool data_dtr;
++
++	mspi_callback_handler_t         cbs[MSPI_BUS_EVENT_MAX];
++	struct mspi_callback_context    *cb_ctxs[MSPI_BUS_EVENT_MAX];
++	struct mspi_context             ctx;
++};
++
++static int mxic_uefc_init(const struct device *dev)
++{
++	int ret = 0;
++    const struct mspi_mxic_config *cfg = dev->config;
++
++	struct mspi_mxic_data *data = dev->data;
++
++	uint32_t uefc_version = 0;
++
++	DEVICE_MMIO_MAP(dev, K_MEM_CACHE_NONE);
++
++	uintptr_t reg_base = DEVICE_MMIO_GET(dev);
++	printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
++
++	uefc_version = MXIC_RD32(reg_base + INT_STS_SIG_EN);
++	MXIC_WR32(UEFC_BASE_MAP_ADDR, reg_base + BASE_MAP_ADDR);
++	MXIC_WR32(UEFC_TOP_MAP_ADDR, reg_base + TOP_MAP_ADDR);
++	printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
++
++	UPDATE_WRITE(HC_CTRL_CH_LUN_PORT_MASK, UEFC_CH_LUN_PORT, reg_base + HC_CTRL);
++	UPDATE_WRITE(DEV_CTRL_TYPE_MASK | DEV_CTRL_SCLK_SEL_MASK, DEV_CTRL_TYPE_SPI | DEV_CTRL_SCLK_SEL_DIV(4), reg_base + DEV_CTRL);
++
++	uefc_version = MXIC_RD32(reg_base + HC_VER);
++
++	UPDATE_WRITE(HC_CTRL_SIO_SHIFTER(3), HC_CTRL_SIO_SHIFTER(3), reg_base + HC_CTRL);
++	printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
++	MXIC_WR32(CLK_CTRL_RX_SS_A(1) | CLK_CTRL_RX_SS_B(1), reg_base + CLK_CTRL);
++
++	MXIC_WR32(INT_STS_ALL_CLR, reg_base + INT_STS);
++	MXIC_WR32(INT_STS_EN_ALL_EN, reg_base + INT_STS_EN);
++	MXIC_WR32(INT_STS_SIG_EN_ALL_EN, reg_base + INT_STS_SIG_EN);
++
++	MXIC_WR32(ERR_INT_STS_ALL_CLR, reg_base + ERR_INT_STS);
++	MXIC_WR32(ERR_INT_STS_EN_ALL_EN, reg_base + ERR_INT_STS_EN);
++	MXIC_WR32(ERR_INT_STS_SIG_EN_ALL_EN, reg_base + ERR_INT_STS_SIG_EN);
++
++	MXIC_WR32(INT_STS_DMA | INT_STS_EN_DMA_TFR_CMPLT, reg_base + INT_STS_EN);
++
++	MXIC_WR32(SAMPLE_ADJ_DQS_IDLY_DOPI(0) | SAMPLE_ADJ_POINT_SEL_DDR(0) |
++			SAMPLE_ADJ_POINT_SEL_SDR(1), reg_base + SAMPLE_ADJ);
++	printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
++	MXIC_WR32(0, reg_base + SIO_IDLY_1);
++	MXIC_WR32(0, reg_base + SIO_IDLY_2);
++	MXIC_WR32(0, reg_base + SIO_ODLY_1);
++	MXIC_WR32(0, reg_base + SIO_ODLY_2);
++
++	//  k_sem_init(&data->sync_sem, 0, 1);
++
++	return 0;
++}
++
++static int mxic_uefc_poll_hc_reg(const struct device *dev, uint32_t reg, uint32_t mask)
++{
++	uint32_t val, n = 10000;
++	uintptr_t reg_base = DEVICE_MMIO_GET(dev);
++
++	do {
++		val = MXIC_RD32(reg_base + reg) & mask;
++		n--;
++		k_usleep(1);
++	} while (!val && n);
++	if (!val) {
++		LOG_ERR("TIMEOUT! reg(%02Xh) & mask(%08Xh): val(%08Xh)\r\n", reg, mask, val);
++		return -1;
++	}
++	return 0;
++}
++
++static void mxic_uefc_cs_start(const struct device *dev)
++{
++	uintptr_t reg_base = DEVICE_MMIO_GET(dev);
++	
++	/* Enable IO Mode */
++	MXIC_WR32(TFR_CTRL_IO_START, reg_base + TFR_CTRL);
++	while (TFR_CTRL_IO_START & MXIC_RD32(reg_base + TFR_CTRL));
++
++	/* Enable host controller, reset counter */
++	MXIC_WR32(TFR_CTRL_HC_ACT, reg_base + TFR_CTRL);
++	while (TFR_CTRL_HC_ACT & MXIC_RD32(reg_base + TFR_CTRL));
++
++	/* Assert CS */
++	MXIC_WR32(TFR_CTRL_DEV_ACT, reg_base + TFR_CTRL);
++	while (TFR_CTRL_DEV_ACT & MXIC_RD32(reg_base + TFR_CTRL));
++}
++
++static void mxic_uefc_cs_end(const struct device *dev)
++{
++	uintptr_t reg_base = DEVICE_MMIO_GET(dev);
++
++	/* De-assert CS */
++	MXIC_WR32(TFR_CTRL_DEV_DIS, reg_base + TFR_CTRL);
++	while (TFR_CTRL_DEV_DIS & MXIC_RD32(reg_base + TFR_CTRL));
++
++	/* Disable IO Mode */
++	MXIC_WR32(TFR_CTRL_IO_END, reg_base + TFR_CTRL);
++	while (TFR_CTRL_IO_END & MXIC_RD32(reg_base + TFR_CTRL));
++}
++
++static inline void mxic_uefc_err_dessert_cs(const struct device *dev)
++{
++	mxic_uefc_cs_end(dev);
++}
++
++static int mxic_uefc_io_mode_xfer(const struct device *dev, void *tx, void *rx, uint32_t len,
++	uint8_t is_data)
++{
++	uint32_t nbytes, tmp = 0, ofs = 0;
++	struct mspi_mxic_data *data = dev->data;
++	uintptr_t reg_base = DEVICE_MMIO_GET(dev);
++printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
++
++	uint8_t data_octal_dtr = is_data && data->data_dtr && (8 == data->data_buswidth);
++
++	while (ofs < len) {
++		int ret;
++
++		nbytes = len - ofs;
++		data = 0xffffffff;
++
++		if (nbytes > 4) {
++			nbytes = 4;
++		}
++
++		if (tx) {
++			memcpy(&data, tx + ofs, nbytes);
++			LOG_DBG("tx data: %08X\r\n", data);
++		}
++
++		if (data_octal_dtr && (nbytes % 2)) {
++			tmp = nbytes;
++			nbytes++;
++		}
++
++		ret = mxic_uefc_poll_hc_reg(dev, PRES_STS, PRES_STS_TX_NFULL);
++		if (EXIT_SUCCESS != ret) {
++			return ret;
++		}
++
++		MXIC_WR32(data, reg_base + TXD(nbytes % 4));
++		ret = mxic_uefc_poll_hc_reg(dev, PRES_STS, PRES_STS_RX_NEMPT);
++		if (EXIT_SUCCESS != ret) {
++			return ret;
++		}
++
++		data = MXIC_RD32(reg_base + RXD_REG);
++		if (rx) {
++			memcpy(rx + ofs, &data, tmp ? tmp : nbytes);
++		}
++		LOG_DBG("rx data: %08X\r\n", data);
++		ofs += nbytes;
++	}
++
++	return EXIT_SUCCESS;
++}
++
++static void mspi_mxic_set_line(const struct device *dev, enum mspi_io_mode io_mode,
++					  enum mspi_data_rate data_rate)
++{
++	struct mspi_mxic_data *data = dev->data;
++	const struct mspi_mxic_config *cfg = dev->config;
++	uintptr_t reg_base = DEVICE_MMIO_GET(dev);
++	if (data_rate != MSPI_DATA_RATE_SINGLE) {
++		// LOG_INST_ERR(cfg->log, "%u, incorrect data rate, only SDR is supported.", __LINE__);
++		return -EINVAL;
++	}
++
++    uint32_t cmd_bus = 0;
++    uint32_t addr_bus = 0;
++    uint32_t data_bus = 0;
++
++    bool cmd_ddr  = false;
++    bool addr_ddr = false;
++    bool data_ddr = false;
++
++    switch (data_rate) {
++    case MSPI_DATA_RATE_SINGLE:
++        break;
++    case MSPI_DATA_RATE_S_S_D:
++        data_ddr = true;
++        break;
++    case MSPI_DATA_RATE_S_D_D:
++        addr_ddr = true;
++        data_ddr = true;
++        break;
++    case MSPI_DATA_RATE_DUAL:
++        cmd_ddr = addr_ddr = data_ddr = true;
++        break;
++    default:
++        break;
++    }
++
++    uint8_t cmd_lines = 1;
++    uint8_t addr_lines = 1;
++    uint8_t data_lines = 1;
++
++    switch (io_mode) {
++    case MSPI_IO_MODE_SINGLE:
++        break;
++    case MSPI_IO_MODE_DUAL:
++    case MSPI_IO_MODE_DUAL_1_1_2:
++        data_lines = 2;
++        break;
++    case MSPI_IO_MODE_DUAL_1_2_2:
++        addr_lines = data_lines = 2;
++        break;
++    case MSPI_IO_MODE_QUAD:
++    case MSPI_IO_MODE_QUAD_1_4_4:
++        addr_lines = data_lines = 4;
++        break;
++    case MSPI_IO_MODE_QUAD_1_1_4:
++        data_lines = 4;
++        break;
++    case MSPI_IO_MODE_OCTAL:
++    case MSPI_IO_MODE_OCTAL_1_8_8:
++        addr_lines = data_lines = 8;
++        break;
++    case MSPI_IO_MODE_OCTAL_1_1_8:
++        data_lines = 8;
++        break;
++    default:
++        break;
++    }
++
++    cmd_bus  = cmd_lines  == 1 ? 0 : cmd_lines == 2 ? 1 : cmd_lines == 4 ? 2 : 3;
++    addr_bus = addr_lines == 1 ? 0 : addr_lines == 2 ? 1 : addr_lines == 4 ? 2 : 3;
++    data_bus = data_lines == 1 ? 0 : data_lines == 2 ? 1 : data_lines == 4 ? 2 : 3;
++
++	uint32_t conf = MXIC_RD32(reg_base + INT_STS_SIG_EN);
++
++	conf &= ~(
++		TFR_MODE_CMD_BUSW_MASK |
++		TFR_MODE_ADDR_BUSW_MASK |
++		TFR_MODE_DATA_BUSW_MASK |
++		TFR_MODE_DATA_DTR |
++		TFR_MODE_ADDR_DTR |
++		TFR_MODE_CMD_DTR
++	);
++
++	conf =	OP_CMD_BUSW(cmd_bus) |
++			OP_CMD_DTR(cmd_ddr  ? 1 : 0);
++
++	conf |= OP_ADDR_BUSW(addr_bus) |
++			OP_ADDR_DTR(addr_ddr ? 1 : 0);
++
++	conf |= OP_DATA_BUSW(data_bus) |
++			OP_DATA_DTR(data_ddr ? 1 : 0);
++
++	data->data_buswidth = data_lines;
++	data->data_dtr = data_ddr;
++
++	MXIC_WR32(conf, reg_base + TFR_MODE);	
++}
++
++static inline void mspi_context_release(struct mspi_context *ctx)
++{
++	ctx->owner = NULL;
++	k_sem_give(&ctx->lock);
++}
++
++static int mspi_mxic_dev_config(const struct device *dev,
++				 const struct mspi_dev_id *dev_id,
++				 const enum mspi_dev_cfg_mask param_mask,
++				 const struct mspi_dev_cfg *dev_cfg)
++{
++	const struct mspi_mxic_config *cfg = dev->config;
++	struct mspi_mxic_data *data = dev->data;
++	uintptr_t reg_base = DEVICE_MMIO_GET(dev);
++	int ret = 0;
++
++	if (param_mask == MSPI_DEVICE_CONFIG_NONE ) {
++		/* Do nothing except obtaining the controller lock */
++		data->dev_id = (struct mspi_dev_id *)dev_id;
++		return ret;
++	} else if (param_mask != MSPI_DEVICE_CONFIG_ALL) {
++		if (data->dev_id != dev_id) {
++			// LOG_INST_ERR(cfg->log, "%u, config failed, must be the same device.",
++			// 	     __LINE__);
++			ret = -ENOTSUP;
++			goto e_return;
++		}
++
++		if ((param_mask & (~(MSPI_DEVICE_CONFIG_FREQUENCY |
++				     MSPI_DEVICE_CONFIG_IO_MODE |
++				     MSPI_DEVICE_CONFIG_CE_NUM |
++				     MSPI_DEVICE_CONFIG_DATA_RATE |
++				     MSPI_DEVICE_CONFIG_CMD_LEN |
++				     MSPI_DEVICE_CONFIG_ADDR_LEN)))) {
++			// LOG_INST_ERR(cfg->log, "%u, config type not supported.", __LINE__);
++			ret = -ENOTSUP;
++			goto e_return;
++		}
++
++		if (param_mask & MSPI_DEVICE_CONFIG_FREQUENCY) {
++			UPDATE_WRITE(DEV_CTRL_SCLK_SEL_MASK, DEV_CTRL_SCLK_SEL_DIV(4), reg_base + DEV_CTRL);
++			data->dev_cfg.freq = dev_cfg->freq;
++		}
++
++		if ((param_mask & MSPI_DEVICE_CONFIG_IO_MODE) ||
++		    (param_mask & MSPI_DEVICE_CONFIG_CE_NUM) ||
++		    (param_mask & MSPI_DEVICE_CONFIG_DATA_RATE)) {
++			mspi_mxic_set_line(dev, dev_cfg->io_mode, dev_cfg->data_rate);
++
++			data->dev_cfg.freq      = dev_cfg->io_mode;
++			data->dev_cfg.data_rate = dev_cfg->data_rate;
++		}
++
++		if (param_mask & MSPI_DEVICE_CONFIG_CMD_LEN) {
++			if (dev_cfg->cmd_length > MXIC_UEFC_CMD_LENGTH ||
++			    dev_cfg->cmd_length == 0) {
++				// LOG_INST_ERR(cfg->log, "%u, invalid cmd_length.", __LINE__);
++				ret = -ENOTSUP;
++				goto e_return;
++			}
++
++			UPDATE_WRITE(TFR_MODE_CMD_CNT, OP_CMD_CNT(dev_cfg->cmd_length) , TFR_MODE);
++
++			data->dev_cfg.cmd_length = dev_cfg->cmd_length;
++		}
++
++		if (param_mask & MSPI_DEVICE_CONFIG_ADDR_LEN) {
++			if (dev_cfg->addr_length > MXIC_UEFC_ADDR_LENGTH ||
++			    dev_cfg->addr_length == 0) {
++				// LOG_INST_ERR(cfg->log, "%u, invalid addr_length.", __LINE__);
++				ret = -ENOTSUP;
++				goto e_return;
++			}
++
++			UPDATE_WRITE(TFR_MODE_ADDR_CNT_MASK, OP_ADDR_CNT(dev_cfg->addr_length), TFR_CTRL);
++
++			data->dev_cfg.addr_length = dev_cfg->addr_length;
++		}
++	} else {
++		if (data->dev_id != dev_id) {
++				goto e_return;
++		}
++
++		if (memcmp(&data->dev_cfg, dev_cfg, sizeof(struct mspi_dev_cfg)) == 0) {
++			/** Nothing to config */
++			data->dev_id = (struct mspi_dev_id *)dev_id;
++			return ret;
++		}
++
++		if (dev_cfg->endian != MSPI_XFER_LITTLE_ENDIAN) {
++			// LOG_INST_ERR(cfg->log, "%u, only support MSB first.", __LINE__);
++			ret = -ENOTSUP;
++			goto e_return;
++		}
++
++		// if (dev_cfg->dqs_enable && !cfg->mspicfg.dqs_support) {
++		// 	// LOG_INST_ERR(cfg->log, "%u, only support non-DQS mode.", __LINE__);
++		// 	ret = -ENOTSUP;
++		// 	goto e_return;
++		// }
++
++		mspi_mxic_set_line(dev, dev_cfg->io_mode, dev_cfg->data_rate);
++
++		UPDATE_WRITE(TFR_MODE_CMD_CNT, OP_CMD_CNT(dev_cfg->cmd_length) , TFR_MODE);
++		UPDATE_WRITE(TFR_MODE_ADDR_CNT_MASK, OP_ADDR_CNT(dev_cfg->addr_length), TFR_MODE);
++
++		data->dev_cfg = *dev_cfg;
++		data->dev_id = (struct mspi_dev_id *)dev_id;
++	}
++
++	return ret;
++
++e_return:
++	k_mutex_unlock(&data->lock);
++	return ret;
++}
++
++static int mspi_pio_prepare(const struct device *dev)
++{
++	const struct mspi_mxic_config *cfg = dev->config;
++	struct mspi_mxic_data *data = dev->data;
++	const struct mspi_xfer *xfer = &data->ctx.xfer;
++	int ret = 0;
++	uintptr_t reg_base = DEVICE_MMIO_GET(dev);
++
++	uint32_t conf = MXIC_RD32(reg_base + INT_STS_SIG_EN);
++	uint16_t dummy_len = DIR_IN == xfer->packets->dir ? xfer->rx_dummy : xfer->tx_dummy;
++	conf &= ~(
++		TFR_MODE_ADDR_CNT_MASK |
++		TFR_MODE_CMD_CNT |
++		TFR_MODE_DMY_MASK |
++		OP_DD_RD
++	);
++
++	conf |= OP_CMD_CNT(xfer->cmd_length) |
++			OP_ADDR_CNT(xfer->addr_length);
++
++	conf |= OP_DMY_CNT(dummy_len, data->data_dtr, data->data_buswidth);
++
++	conf |= (DIR_IN == xfer->packets->dir ? OP_DD_RD: 0);
++
++	MXIC_WR32(conf, reg_base + TFR_MODE);	
++
++	return ret;
++}
++
++static int mspi_pio_transceive(const struct device *dev,
++			       const struct mspi_xfer *xfer,
++			       mspi_callback_handler_t cb,
++			       struct mspi_callback_context *cb_ctx)
++{
++	const struct mspi_mxic_config *cfg = dev->config;
++	struct mspi_mxic_data *data = dev->data;
++	struct mspi_context *ctx = &data->ctx;
++	const struct mspi_xfer_packet *packet;
++	uint32_t packet_idx;
++	int ret = 0;
++printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
++
++	if (xfer->num_packet == 0 ||
++	    !xfer->packets) {
++		return -EFAULT;
++	}
++printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
++
++	mxic_uefc_cs_start(dev);
++printf ("***[%s], [%s], [%04d],xfer->cmd_length is %x \r\n", __FILE__, __func__, __LINE__, xfer->cmd_length);
++
++	/* Set up command  */
++	if (xfer->cmd_length) {
++		ret = mxic_uefc_io_mode_xfer(dev, (uint8_t *)&xfer->cmd_length, 0, xfer->cmd_length,
++				0);
++			printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
++	
++		if (EXIT_SUCCESS != ret) {
++			mxic_uefc_err_dessert_cs(dev);
++			return ret;
++		}
++	}
++printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
++
++	/* Set up address */
++	if (xfer->addr_length) {
++		ret = mxic_uefc_io_mode_xfer(dev, (uint8_t *)&xfer->packets->address, 0, xfer->addr_length, 0);
++		if (EXIT_SUCCESS != ret) {
++			mxic_uefc_err_dessert_cs(dev);
++		}
++	}
++printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
++
++	uint32_t dummy_length = MSPI_TX == xfer->packets->dir ? xfer->tx_dummy : xfer->rx_dummy;
++printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
++
++	/* Setup dummy: dummy's bus width and DTR are determined by the data */
++	if (dummy_length) {
++		uint32_t dummy_len = (dummy_length * (data->data_dtr + 1)) / (8 / (data->data_buswidth));
++		ret = mxic_uefc_io_mode_xfer(dev, 0, 0, dummy_len, 0);
++		if (EXIT_SUCCESS != ret) {
++			mxic_uefc_err_dessert_cs(dev);
++			return ret;
++		}
++	}
++printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
++
++	/* Set up read/write Data */
++	if (xfer->packets->data_buf) {
++		ret = mxic_uefc_io_mode_xfer(dev,
++			MSPI_TX == xfer->packets->dir  ? xfer->packets->data_buf : 0,
++			MSPI_RX == xfer->packets->dir ? xfer->packets->data_buf : 0,
++			xfer->packets->data_buf, 1);
++		if (EXIT_SUCCESS != ret) {
++			mxic_uefc_err_dessert_cs(dev);
++			return ret;
++		}
++	}
++printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
++
++	mxic_uefc_cs_end(dev);
++
++pio_err:
++	mspi_context_release(ctx);
++	return ret;
++}
++
++static int mspi_mxic_transceive(const struct device *dev,
++				 const struct mspi_dev_id *dev_id,
++				 const struct mspi_xfer *xfer)
++{
++	const struct mspi_mxic_config *cfg = dev->config;
++	struct mspi_mxic_data *data = dev->data;
++	mspi_callback_handler_t cb = NULL;
++	struct mspi_callback_context *cb_ctx = NULL;
++printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
++
++	// if (dev_id != data->dev_id) {
++	// 	// LOG_INST_ERR(cfg->log, "%u, dev_id don't match.", __LINE__);
++	// 	return -ESTALE;
++	// }
++printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
++
++	if (xfer->async) {
++		cb = data->cbs[MSPI_BUS_XFER_COMPLETE];
++		cb_ctx = data->cb_ctxs[MSPI_BUS_XFER_COMPLETE];
++	}
++printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
++
++	if (xfer->xfer_mode == MSPI_PIO) {
++		printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
++
++		return mspi_pio_transceive(dev, xfer, cb, cb_ctx);
++	} else if (xfer->xfer_mode == MSPI_DMA) {
++		// return mspi_dma_transceive(dev, xfer, cb, cb_ctx);
++	} else {
++		return -EIO;
++	}
++}
++
++static int mspi_mxic_config(const struct mspi_dt_spec *spec)
++{
++	ARG_UNUSED(spec);
++	return -ENOTSUP;
++}
++
++static struct mspi_driver_api mspi_mxic_driver_api = {
++	.config                = mspi_mxic_config,
++	.dev_config            = mspi_mxic_dev_config,
++	//.get_channel_status    = mspi_mxic_get_channel_status,
++	// .register_callback     = mspi_mxic_register_callback,
++	.transceive            = mspi_mxic_transceive,
++};
++
++static const struct mspi_mxic_config  mspi_mxic_config_0 = {
++	DEVICE_MMIO_ROM_INIT(DT_DRV_INST(0))
++};
++
++static struct mspi_mxic_data  mspi_mxic_data_0; 
++
++DEVICE_DT_INST_DEFINE(0,                                                                 
++				&mxic_uefc_init,                                                   
++				NULL,                                          
++				&mspi_mxic_data_0,                                               
++				&mspi_mxic_config_0,                                             
++				POST_KERNEL,                                                       
++				CONFIG_MSPI_INIT_PRIORITY,                                         
++				&mspi_mxic_driver_api);
+diff --git a/drivers/mspi/mspi_mxic_uefc.h b/drivers/mspi/mspi_mxic_uefc.h
+new file mode 100644
+index 00000000000..d4e587064a1
+--- /dev/null
++++ b/drivers/mspi/mspi_mxic_uefc.h
+@@ -0,0 +1,565 @@
++/*
++ * Copyright (c) 2024, Ambiq Micro Inc. <www.ambiq.com>
++ *
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++#include <zephyr/logging/log.h>
++#include <zephyr/logging/log_instance.h>
++#include <zephyr/kernel.h>
++#include <zephyr/sys/util.h>
++#include <zephyr/pm/device.h>
++#include <zephyr/drivers/mspi.h>
++#include <zephyr/drivers/gpio.h>
++#include <zephyr/sys_clock.h>
++#include <stdlib.h>
++#include <zephyr/irq.h>
++
++enum HC_XFER_MODE_TYPE {
++	HC_XFER_MODE_IO,
++	HC_XFER_MODE_MAP,
++	HC_XFER_MODE_DMA,
++	MAX_HC_XFER_MODE
++};
++
++#define CHIP_SELECT_COUNT               3u
++#define SPI_WORD_SIZE                   8u
++#define SPI_WR_RD_CHUNK_SIZE_MAX        16u
++#define MXIC_UEFC_CMD_LENGTH   2
++#define MXIC_UEFC_ADDR_LENGTH   4
++
++#define BIT(x) (1U << (x))
++/* Host Controller Register */
++#define HC_CTRL						0x00
++#define HC_CTRL_RQE_EN				BIT(31)
++#define HC_CTRL_SDMA_BD(x)			(((x) & 0x7) << 28)
++#define HC_CTRL_PARALLEL_1			BIT(27)
++#define HC_CTRL_PARALLEL_0			BIT(26)
++#define HC_CTRL_DATA_ORDER			BIT(25) //OctaFlash, OctaRAM
++#define HC_CTRL_SIO_SHIFTER(x)		(((x) & 0x3) << 23)
++#define HC_CTRL_EX_SER_B			BIT(22)
++#define HC_CTRL_EX_SER_A			BIT(21)
++#define HC_CTRL_ASSIMI_BYTE_B(x)	(((x) & 0x3) << 19)
++#define HC_CTRL_ASSIMI_BYTE_A(x)	(((x) & 0x3) << 17)
++#define HC_CTRL_EX_PHY_ITE_B		BIT(16)
++#define HC_CTRL_EX_PHY_ITE_A		BIT(15)
++#define HC_CTRL_EX_PHY_DQS_B		BIT(14)
++#define HC_CTRL_EX_PHY_DQS_A		BIT(13)
++#define HC_CTRL_LED					BIT(12)
++#define HC_CTRL_CH_SEL_B			BIT(11)
++#define HC_CTRL_CH_SEL_A			0
++#define HC_CTRL_CH_MASK				BIT(11)
++#define HC_CTRL_LUN_SEL(x)			(((x) & 0x7) << 8) //NAND
++#define HC_CTRL_LUN_MASK			HC_CTRL_LUN_SEL(0x7)
++#define HC_CTRL_PORT_SEL(x)			(((x) & 0xff) << 0)
++#define HC_CTRL_PORT_MASK			(HC_CTRL_PORT_SEL(0xff))
++
++#define HC_CMD_LENGTH_MASK          OP_CMD_CNT(0x7)
++#define HC_ADDR_LENGTH_MASK         OP_ADDR_CNT(0x7)
++
++#define HC_CTRL_CH_LUN_PORT_MASK	(HC_CTRL_CH_MASK | HC_CTRL_LUN_MASK | HC_CTRL_PORT_MASK)
++#define HC_CTRL_CH_LUN_PORT(ch, lun, port) (HC_CTRL_CH_SEL_##ch | HC_CTRL_LUN_SEL(lun) | HC_CTRL_PORT_SEL(port))
++
++/* Normal Interrupt Status Register */
++#define INT_STS				0x04
++#define INT_STS_CA_REQ			BIT(30)
++#define INT_STS_CACHE_RDY		BIT(29)
++#define INT_STS_AC_RDY			BIT(28)
++#define INT_STS_ERR_INT			BIT(15)
++#define INT_STS_CQE_INT			BIT(14)
++#define INT_STS_DMA_TFR_CMPLT		BIT(7)
++#define INT_STS_DMA_INT			BIT(6)
++#define INT_STS_BUF_RD_RDY		BIT(5)
++#define INT_STS_BUF_WR_RDY		BIT(4)
++#define INT_STS_ALL_CLR 		(INT_STS_AC_RDY | \
++					INT_STS_ERR_INT | \
++					INT_STS_DMA_TFR_CMPLT | \
++					INT_STS_DMA_INT)
++
++/* Error Interrupt Status Register */
++#define ERR_INT_STS			0x08
++#define ERR_INT_STS_ECC			BIT(19)
++#define ERR_INT_STS_PREAM		BIT(18)
++#define ERR_INT_STS_CRC			BIT(17)
++#define ERR_INT_STS_AC			BIT(16)
++#define ERR_INT_STS_ADMA		BIT(9)
++#define ERR_INT_STS_AUTO_CMD		BIT(8)
++#define ERR_INT_STS_DATA_END		BIT(6)
++#define ERR_INT_STS_DATA_CRC		BIT(5)
++#define ERR_INT_STS_DATA_TIMEOUT	BIT(4)
++#define ERR_INT_STS_CMD_IDX		BIT(3)
++#define ERR_INT_STS_CMD_END		BIT(2)
++#define ERR_INT_STS_CMD_CRC		BIT(1)
++#define ERR_INT_STS_CMD_TIMEOUT		BIT(0)
++#define ERR_INT_STS_ALL_CLR		(ERR_INT_STS_ECC | \
++					ERR_INT_STS_PREAM | \
++					ERR_INT_STS_CRC | \
++					ERR_INT_STS_AC | \
++					ERR_INT_STS_ADMA)
++
++/* Normal Interrupt Status Enable Register */
++#define INT_STS_EN			0x0C
++#define INT_STS_EN_CA_REQ		BIT(30)
++#define INT_STS_EN_CACHE_RDY		BIT(29)
++#define INT_STS_EN_AC_RDY		BIT(28)
++#define INT_STS_EN_ERR_INT		BIT(15)
++#define INT_STS_EN_DMA_TFR_CMPLT	BIT(7)
++#define INT_STS_DMA					BIT(6)
++#define INT_STS_EN_BUF_RD_RDY		BIT(5)
++#define INT_STS_EN_BUF_WR_RDY		BIT(4)
++#define INT_STS_EN_DMA_INT		BIT(3)
++#define INT_STS_EN_BLK_GAP		BIT(2)
++#define INT_STS_EN_DAT_CMPLT		BIT(1)
++#define INT_STS_EN_CMD_CMPLT		BIT(0)
++#define INT_STS_EN_ALL_EN		(INT_STS_EN_AC_RDY | \
++					INT_STS_EN_ERR_INT | \
++					INT_STS_EN_DMA_TFR_CMPLT | \
++					INT_STS_EN_DMA_INT)
++
++/* Error Interrupt Status Enable Register */
++#define ERR_INT_STS_EN			0x10
++#define ERR_INT_STS_EN_ECC		BIT(19)
++#define ERR_INT_STS_EN_PREAM		BIT(18)
++#define ERR_INT_STS_EN_CRC		BIT(17)
++#define ERR_INT_STS_EN_AC		BIT(16)
++#define ERR_INT_STS_EN_ADMA		BIT(9)
++#define ERR_INT_STS_EN_AUTO_CMD		BIT(8)
++#define ERR_INT_STS_EN_DATA_END		BIT(6)
++#define ERR_INT_STS_EN_DATA_CRC		BIT(5)
++#define ERR_INT_STS_EN_DATA_TIMEOUT	BIT(4)
++#define ERR_INT_STS_EN_CMD_IDX		BIT(3)
++#define ERR_INT_STS_EN_CMD_END		BIT(2)
++#define ERR_INT_STS_EN_CMD_CRC		BIT(1)
++#define ERR_INT_STS_EN_CMD_TIMEOUT	BIT(0)
++#define ERR_INT_STS_EN_ALL_EN		(ERR_INT_STS_EN_ECC | \
++					ERR_INT_STS_EN_PREAM | \
++					ERR_INT_STS_EN_CRC | \
++					ERR_INT_STS_EN_AC | \
++					ERR_INT_STS_EN_ADMA)
++
++/* Normal Interrupt Signal Enable Register */
++#define INT_STS_SIG_EN			0x14
++#define INT_STS_SIG_EN_CA_REQ		BIT(30)
++#define INT_STS_SIG_EN_CACHE_RDY	BIT(29)
++#define INT_STS_SIG_EN_AC_RDY		BIT(28)
++#define INT_STS_SIG_EN_ERR_INT		BIT(15)
++#define INT_STS_SIG_EN_DMA_TFR_CMPLT	BIT(7)
++#define INT_STS_SIG_EN_BUF_RD_RDY	BIT(5)
++#define INT_STS_SIG_EN_BUF_WR_RDY	BIT(4)
++#define INT_STS_SIG_EN_DMA_INT		BIT(3)
++#define INT_STS_SIG_EN_BLK_GAP		BIT(2)
++#define INT_STS_SIG_EN_DAT_CMPLT	BIT(1)
++#define INT_STS_SIG_EN_CMD_CMPLT	BIT(0)
++#define INT_STS_SIG_EN_ALL_EN		(INT_STS_SIG_EN_AC_RDY | \
++					INT_STS_SIG_EN_ERR_INT | \
++					INT_STS_SIG_EN_DMA_TFR_CMPLT | \
++					INT_STS_SIG_EN_DMA_INT)
++
++/* Error Interrupt Signal Enable Register */
++#define ERR_INT_STS_SIG_EN		0x18
++#define ERR_INT_STS_SIG_EN_ECC		BIT(19)
++#define ERR_INT_STS_SIG_EN_PREAM	BIT(18)
++#define ERR_INT_STS_SIG_EN_CRC		BIT(17)
++#define ERR_INT_STS_SIG_EN_AC		BIT(16)
++#define ERR_INT_STS_SIG_EN_ADMA		BIT(9)
++#define ERR_INT_STS_SIG_EN_AUTO_CMD	BIT(8)
++#define ERR_INT_STS_SIG_EN_DATA_END	BIT(6)
++#define ERR_INT_STS_SIG_EN_DATA_CRC	BIT(5)
++#define ERR_INT_STS_SIG_EN_DATA_TIMEOUT BIT(4)
++#define ERR_INT_STS_SIG_EN_CMD_IDX	BIT(3)
++#define ERR_INT_STS_SIG_EN_CMD_END	BIT(2)
++#define ERR_INT_STS_SIG_EN_CMD_CRC	BIT(1)
++#define ERR_INT_STS_SIG_EN_CMD_TIMEOUT	BIT(0)
++#define ERR_INT_STS_SIG_EN_ALL_EN	(ERR_INT_STS_SIG_EN_ECC | \
++					ERR_INT_STS_SIG_EN_PREAM | \
++					ERR_INT_STS_SIG_EN_CRC | \
++					ERR_INT_STS_SIG_EN_AC | \
++					ERR_INT_STS_SIG_EN_ADMA)
++
++/* Transfer Mode register */
++#define TFR_MODE			0x1C
++	#define TFR_MODE_BUSW_1			0
++	#define TFR_MODE_BUSW_2			1
++	#define TFR_MODE_BUSW_4			2
++	#define TFR_MODE_BUSW_8			3
++#define TFR_MODE_DMA_TYPE		BIT(31)
++#define TFR_MODE_DMA_KEEP_CSB		BIT(30)
++#define TFR_MODE_TO_ENHC		BIT(29)
++#define TFR_MODE_PREAM_WITH		BIT(28)
++#define TFR_MODE_CSB_DONT_CARE		BIT(27)
++#define TFR_MODE_CMD_CNT    		BIT(17)
++#define TFR_MODE_DATA_DTR    		BIT(16)
++#define TFR_MODE_ADDR_DTR    		BIT(13)
++#define TFR_MODE_CMD_DTR    		BIT(10)
++
++#define TFR_MODE_ADDR_CNT_MASK  	OP_ADDR_CNT(0x7)
++
++
++#define TFR_MODE_SIO_1X_RD_BUS(x)	(((x) & 0x3) << 6)
++#define TFR_MODE_MULT_BLK		BIT(5)
++#define TFR_MODE_AUTO_CMD(x)		(((x) & 0x3) << 2)
++#define TFR_MODE_CNT_EN			BIT(1)
++#define TFR_MODE_DMA_EN			BIT(0)
++/* share with MAPRD, MAPWR */
++	#define OP_DMY_CNT(_len, _dtr, _bw) (((_len * (_dtr + 1)) / (8 / (_bw))) << 21)
++
++	#define OP_DMY(x)		(((x) & 0x3F) << 21)
++	#define TFR_MODE_DMY_MASK			(OP_DMY(0x3f))
++	#define TFR_MODE_DATA_BUSW_MASK			(OP_DATA_BUSW(0x3))
++	#define TFR_MODE_CMD_BUSW_MASK			(OP_CMD_BUSW(0x3))
++	#define TFR_MODE_ADDR_BUSW_MASK			(OP_ADDR_BUSW(0x3))
++
++	#define TFR_MODE_ADDR_CNT_MASK			(OP_ADDR_CNT(0x7))
++
++
++	#define OP_ADDR_CNT(x)		(((x) & 0x7) << 18)
++	#define OP_CMD_CNT(x)		(((x) - 1) << 17)
++	#define OP_DATA_BUSW(x)		(((x) & 0x3) << 14)
++	#define OP_DATA_DTR(x)		(((x) & 0x1) << 16)
++	#define OP_ADDR_BUSW(x)		(((x) & 0x3) << 11)
++	#define OP_ADDR_DTR(x)		(((x) & 0x1) << 13)
++	#define OP_CMD_BUSW(x)		(((x) & 0x3) << 8)
++	#define OP_CMD_DTR(x)		(((x) & 1) << 10)
++	#define OP_DD_RD		BIT(4)
++
++/* Transfer Control Register */
++#define TFR_CTRL			0x20
++#define TFR_CTRL_DEV_DIS		BIT(18)
++#define TFR_CTRL_IO_END			BIT(16)
++#define TFR_CTRL_DEV_ACT		BIT(2)
++#define TFR_CTRL_HC_ACT			BIT(1)
++#define TFR_CTRL_IO_START		BIT(0)
++
++/* Present State Register */
++#define PRES_STS			0x24
++#define PRES_STS_ADMA(x)		(((x) & 0x7) << 29)
++#define PRES_STS_XSPI_TX(x)		(((x) & 0xF) << 25)
++#define PRES_STS_ONFI_TX(x)		(((x) & 0x1F) << 20)
++#define PRES_STS_RX_NFULL		BIT(19)
++#define PRES_STS_RX_NEMPT		BIT(18)
++#define PRES_STS_TX_NFULL		BIT(17)
++#define PRES_STS_TX_EMPT		BIT(16)
++#define PRES_STS_EMMC_TX(x)		(((x) & 0xF) << 12)
++#define PRES_STS_BUF_RD_EN		BIT(11)
++#define PRES_STS_BUF_WR_EN		BIT(10)
++#define PRES_STS_RD_TFR			BIT(9)
++#define PRES_STS_WR_TFR			BIT(8)
++#define PRES_STS_DAT_ACT		BIT(2)
++#define PRES_STS_CMD_INH_DAT	BIT(1)
++#define PRES_STS_CMD_INH_CMD	BIT(0)
++
++/* SDMA Transfer Count Register */
++#define SDMA_CNT			0x28
++#define SDMA_CNT_TFR_BYTE(x)	(((x) & 0xFFFFFFFF) << 0)
++
++/* SDMA System Address Register */
++#define SDMA_ADDR			0x2C
++#define SDMA_VAL(x)				(((x) & 0xFFFFFFFF) << 0)
++
++/* ADMA2_System Address Register */
++#define ADMA2_ADDR			0x30
++#define ADMA2_ADDR_VALUE		(((x) & 0xFFFFFFFF) << 0)
++
++/* ADMA3 System Address Register */
++#define ADMA3_ADDR			0x34
++#define ADMA3_ADDR_VALUE(x)		(((x) & 0xFFFFFFFF) << 0)
++
++/* Mapping Base Address Register */
++#define BASE_MAP_ADDR			0x38
++#define BASE_MAP_ADDR_VALUE(x)		(((x) & 0xFFFFFFFF) << 0)
++
++/* Software Reset Register */
++#define SW_RST				0x44
++#define SW_RST_DAT			BIT(2)
++#define SW_RST_CMD			BIT(1)
++#define SW_RST_ALL			BIT(0)
++
++/* Timeout Control register */
++#define TO_CTRL				0x48
++#define TO_CTRL_CA(x)			(((x) & 0xF) << 16)
++#define TO_CTRL_DAT(x)			(((x) & 0xF) << 16)
++
++/* Clock Control Register */
++#define CLK_CTRL			0x4C
++#define CLK_CTRL_SLOW_CLOCK		BIT(31)
++#define CLK_CTRL_RX_SS_B(x)		(((x) & 0x1F) << 21)
++#define CLK_CTRL_RX_SS_A(x)		(((x) & 0x1F) << 16)
++#define CLK_CTRL_PLL_SELECT(x)		(((x) & 0xFFFF) << 0)
++
++/* Cache Control Register */
++#define CACHE_CTRL			0x54
++#define CACHE_CTRL_DIRTY_LEVEL(x)	(((x) & 0x3) << 30)
++#define CACHE_CTRL_LEN_TH(x)		(((x) & 0xff) << 22)
++#define CACHE_CTRL_CONT_ADDR		BIT(21)
++#define CACHE_CTRL_FETCH_CNT(x)		(((x) & 0x7) << 18)
++#define CACHE_CTRL_MST(x)		(((x) & 0xFFFF) << 2)
++#define CACHE_CTRL_CLEAN		BIT(1)
++#define CACHE_CTRL_INVALID		BIT(0)
++
++/* Capabilities Register */
++#define CAP_1				0x58
++#define CAP_1_DUAL_CH			BIT(31)
++#define CAP_1_XSPI_ITF			BIT(30)
++#define CAP_1_ONFI_ITF			BIT(29)
++#define CAP_1_EMMC_ITF			BIT(28)
++#define CAP_1_MAPPING_MODE		BIT(27)
++#define CAP_1_CACHE			BIT(26)
++#define CAP_1_ATOMIC			BIT(25)
++#define CAP_1_DMA_SLAVE_MODE		BIT(24)
++#define CAP_1_DMA_MASTER_MODE		BIT(23)
++#define CAP_1_CQE			BIT(22)
++#define CAP_1_FIFO_DEPTH(x)		(((x) & 0x3) << 15)
++#define CAP_1_SYS_DW(x)			(((x) & 0x3) << 13)
++#define CAP_1_LUN_NUM(x)		(((x) & 0xF) << 9)
++#define CAP_1_CSB_NUM(x)		(((x) & 0x1FF) << 0)
++#define CAP_1_CSB_NUM_MASK		0x1FF
++#define CAP_1_CSB_NUM_OFS		0
++
++/* Host Controller Version Register */
++#define HC_VER				0x5C
++#define HC_VER_VALUE(x)			(((x) & 0xFFFFFFFF) << 0)
++
++/*  RTL Version Register */
++#define RTL_VER				0x60
++#define RTL_VER_VALUE(x)		(((x) & 0xFFFFFFFF) << 0)
++
++/* Transmit Data 0~3 Register */
++#define TXD_REG				0x70
++#define TXD(x)				(TXD_REG + ((x) * 4))
++
++/* Receive Data Register */
++#define RXD_REG				0x80
++#define RXD_VALUE(x)			(((x) & 0xFFFFFFFF) << 0)
++
++/* Send CRC Cycle Register */
++#define SEND_CRC_CYC			0x84
++#define SEND_CRC_CYC_EN			BIT(0)
++
++/* Block Count Register */
++#define BLK_CNT				0x90
++#define BLK_CNT_VALUE(x)		(((x) & 0xFFFFFFFF) << 0)
++
++/* Argument Register */
++#define ARG_REG				0x94
++#define ARG_REG_CMD(x)			(((x) & 0xFFFFFFFF) << 0)
++
++/* Command Register */
++#define CMD_REG				0x98
++#define CMD_REG_BOOT_BUS(x)		(((x) & 0x7) << 19)
++#define CMD_REG_BOOT_TYPE		BIT(18)
++#define CMD_REG_BOOT_ACK_EN		BIT(17)
++#define CMD_REG_BOOT_EN			BIT(16)
++#define CMD_REG_CMD_IDX(x)		(((x) & 3F) << 8)
++#define CMD_REG_WR_CRC_STS_EN		BIT(6)
++#define CMD_REG_DAT_EN			BIT(5)
++#define CMD_REG_CMD_IDX_CHK_EN		BIT(4)
++#define CMD_REG_CMD_CRC_CHK_EN		BIT(3)
++#define CMD_REG_RSP_SEL(x)		(((x) & 0x3) << 0)
++
++/* Response 1 Register */
++#define RSP_1				0x9C
++#define RSP_1_VALUE(x)			(((x) & 0xFFFFFFFF) << 0)
++
++/* Response 2 Register */
++#define RSP_2				0xA0
++#define RSP_2_VALUE(x)			(((x) & 0xFFFFFFFF) << 0)
++
++/* Response 3 Register */
++#define RSP_3				0xA4
++#define RSP_3_VALUE(x)			(((x) & 0xFFFFFFFF) << 0)
++
++/* Response 4 Register */
++#define RSP_4				0xA8
++#define RSP_4_1_VALUE(x)		(((x) & 0xff) << 0)
++#define RSP_4_0_VALUE(x)		(((x) & 0xFFFFFFFF) << 0)
++
++/* Buffer Data Port register */
++#define DATA_REG			0xAC
++#define DATA_REG_BUF(x)			(((x) & 0xFFFFFFFF) << 0)
++
++/* Auto CMD Argument Register */
++#define AUTO_CMD				0xB0
++#define AUTO_CMD_ARGU(x)		(((x) & 0xFFFFFFFF) << 0)
++
++/* Auto CMD Error Status Register */
++#define AUTO_CMD_ERR_STS		0xB4
++#define AUTO_CMD_ERR_STS_IDX		BIT(4)
++#define AUTO_CMD_ERR_STS_END		BIT(3)
++#define AUTO_CMD_ERR_STS_CRC		BIT(2)
++#define AUTO_CMD_ERR_STS_TIMEOUT	BIT(1)
++
++/* Boot System Address Register */
++#define BOOT_SYS_ADDR			0xB8
++#define BOOT_SYS_ADDR_VALUE(x)		(((x) & 0xFFFFFFFF) << 0)
++
++/* Block Gap Control Register */
++#define BLK_GAP_CTRL			0xBC
++#define BLK_GAP_CTRL_CONT_REQ		BIT(1)
++#define BLK_GAP_CTRL_STOP_GAP		BIT(0)
++
++/* Device Present Status Register */
++#define DEV_CTRL				0xC0
++#define DEV_CTRL_TYPE(x)			(((x) & 0x7) << 29)
++	#define DEV_CTRL_TYPE_MASK			DEV_CTRL_TYPE(0x7)
++	#define DEV_CTRL_TYPE_SPI			DEV_CTRL_TYPE(0)
++	#define DEV_CTRL_TYPE_LYBRA			DEV_CTRL_TYPE(1)
++	#define DEV_CTRL_TYPE_OCTARAM		DEV_CTRL_TYPE(2)
++	#define DEV_CTRL_TYPE_RAWNAND_ONFI	DEV_CTRL_TYPE(4)
++	#define DEV_CTRL_TYPE_RAWNAND_JEDEC	DEV_CTRL_TYPE(5)
++	#define DEV_CTRL_TYPE_EMMC			DEV_CTRL_TYPE(6)
++#define DEV_CTRL_SCLK_SEL(x)		(((x) & 0xF) << 25)
++#define DEV_CTRL_SCLK_SEL_MASK		DEV_CTRL_SCLK_SEL(0xF)
++#define DEV_CTRL_SCLK_SEL_DIV(x)	(((x >> 1) - 1) << 25)
++#define DEV_CTRL_CACHEABLE			BIT(24)
++#define DEV_CTRL_WR_PLCY(x)			(((x) & 0x3) << 22)
++#define DEV_CTRL_PAGE_SIZE(x)		(((x) & 0x7) << 19)
++#define DEV_CTRL_BLK_SIZE(x)		(((x) & 0xFFF) << 7)
++#define DEV_CTRL_PRE_DQS_EN			BIT(6)
++#define DEV_CTRL_DQS_EN				BIT(5)
++#define DEV_CTRL_CRC_EN				BIT(4)
++#define DEV_CTRL_CRCB_IN_EN			BIT(3)
++#define DEV_CTRL_CRC_CHUNK_SIZE(x)	(((x) & 0x3) << 1)
++#define DEV_CTRL_CRCB_OUT_EN		BIT(0)
++
++/* Mapping Read Control Register */
++#define MAP_RD_CTRL			0xC4
++#define MAP_RD_CTRL_PREAM_EN		BIT(28)
++#define MAP_RD_CTRL_SIO_1X_RD(x)	(((x) & 0x3) << 6)
++
++/* Linear/Mapping Write Control Register */
++#define MAP_WR_CTRL			0xC8
++
++/* Mapping Command Register */
++#define MAP_CMD_RD			0xCC    
++#define MAP_CMD_WR			0xCE
++
++/* Top Mapping Address Register */
++#define TOP_MAP_ADDR			0xD0
++#define TOP_MAP_ADDR_VALUE(x)		(((x) & 0xFFFFFFFF) << 0)
++
++/* General Purpose Inputs and Outputs Register */
++#define GPIO_REG			0xD4
++#define GPIO_REG_DATA_LEVEL(x)		(((x) & 0xff) << 24)
++#define GPIO_REG_RYBYB_LEVE			BIT(23)
++#define GPIO_REG_CMD_LEVEL			BIT(22)
++#define GPIO_REG_SIO3_EN			BIT(13)
++#define GPIO_REG_SIO2_EN			BIT(12)
++#define GPIO_REG_SIO3_DRIV_HIGH		BIT(5)
++#define GPIO_REG_SIO2_DRIV_HIGH		BIT(4)
++#define GPIO_REG_HP_DRIV_HIGH		BIT(3)
++#define GPIO_REG_RESTB_DRIV_HIGH	BIT(2)
++#define GPIO_REG_HOLDB_DRIV_HIGH	BIT(1)
++#define GPIO_REG_WPB_DRIV_HIGH		BIT(0)
++
++/* Auto Calibration Control Register */
++#define AC_CTRL				0xD8
++#define AC_CTRL_CMD_2(x)			(((x) & 0xff) << 24)
++#define AC_CTRL_CMD_1(x)			(((x) & 0xff) << 16)
++#define AC_CTRL_WINDOW(x)			(((x) & 0x3) << 14)
++#define AC_CTRL_LAZY_DQS_EN			BIT(9)
++#define AC_CTRL_LEN_32B_SEL			BIT(8)
++#define AC_CTRL_PHY_EN				BIT(6)
++#define AC_CTRL_DQS_TEST_EN			BIT(5)
++#define AC_CTRL_SIO_ALIG_EN			BIT(4)
++#define AC_CTRL_NVDDR_EN			BIT(3)
++#define AC_CTRL_SAMPLE_DQS_EN		BIT(2)
++#define AC_CTRL_SAMPLE_EN			BIT(1)
++#define AC_CTRL_START				BIT(0)
++
++/* Preamble Bit 1 Register */
++#define PREAM_1_REG			0xDC
++#define PREAM_1_REG_SIO_1(x)		(((x) & 0xFFFF) << 16)
++#define PREAM_1_REG_SIO_0(x)		(((x) & 0xFFFF) << 0)
++
++/* Preamble Bit 2 Register */
++#define PREAM_2_REG			0xE0
++#define PREAM_2_REG_SIO_3(x)		(((x) & 0xFFFF) << 16)
++#define PREAM_2_REG_SIO_2(x)		(((x) & 0xFFFF) << 0)
++
++/* Preamble Bit 3 Register */
++#define PREAM_3_REG 0xE4
++#define PREAM_3_REG_SIO_5(x)		(((x) & 0xFFFF) << 16)
++#define PREAM_3_REG_SIO_4(x)		(((x) & 0xFFFF) << 0)
++
++/* Preamble Bit 4 Register */
++#define PREAM_4_REG 0xE8
++#define PREAM_4_REG_SIO_7(x)		(((x) & 0xFFFF) << 16)
++#define PREAM_4_REG_SIO_6(x)		(((x) & 0xFFFF) << 0)
++
++/* Sample Point Adjust Register */
++#define SAMPLE_ADJ 			0xEC
++#define SAMPLE_ADJ_DQS_IDLY_DOPI(x)	(((x) & 0xff) << 24)
++#define SAMPLE_ADJ_DQS_IDLY_SOPI(x)	(((x) & 0xff) << 16)
++#define SAMPLE_ADJ_DQS_ODLY(x)		(((x) & 0xff) << 8)
++#define SAMPLE_ADJ_POINT_SEL_DDR(x)	(((x) & 0x7) << 3)
++#define SAMPLE_ADJ_POINT_SEL_SDR(x)	(((x) & 0x7) << 0)
++
++/* SIO Input Delay 1 Register */
++#define SIO_IDLY_1 0xF0
++#define SIO_IDLY_1_SIO3(x)		(((x) & 0xff) << 24)
++#define SIO_IDLY_1_SIO2(x)		(((x) & 0xff) << 16)
++#define SIO_IDLY_1_SIO1(x)		(((x) & 0xff) << 8)
++#define SIO_IDLY_1_SIO0(x)		(((x) & 0xff) << 0)
++
++/* SIO Input Delay 2 Register */
++#define SIO_IDLY_2 0xF4
++#define SIO_IDLY_2_SIO4(x)		(((x) & 0xff) << 24)
++#define SIO_IDLY_2_SIO5(x)		(((x) & 0xff) << 16)
++#define SIO_IDLY_2_SIO6(x)		(((x) & 0xff) << 8)
++#define SIO_IDLY_2_SIO7(x)		(((x) & 0xff) << 0)
++#define IDLY_CODE_VAL(x, v)		((v) << (((x) % 4) * 8))
++
++/* SIO Output Delay 1 Register */
++#define SIO_ODLY_1			0xF8
++#define SIO_ODLY_1_SIO3(x)		(((x) & 0xff) << 24)
++#define SIO_ODLY_1_SIO2(x)		(((x) & 0xff) << 16)
++#define SIO_ODLY_1_SIO1(x)		(((x) & 0xff) << 8)
++#define SIO_ODLY_1_SIO0(x)		(((x) & 0xff) << 0)
++
++/* SIO Output Delay 2 Register */
++#define SIO_ODLY_2			0xFC
++#define SIO_ODLY_2_SIO4(x)		(((x) & 0xff) << 24)
++#define SIO_ODLY_2_SIO5(x)		(((x) & 0xff) << 16)
++#define SIO_ODLY_2_SIO6(x)		(((x) & 0xff) << 8)
++#define SIO_ODLY_2_SIO7(x)		(((x) & 0xff) << 0)
++
++#define CONF_HC_XFER_MODE_IO	HC_XFER_MODE_IO
++#define CONF_HC_XFER_MODE_MAP	HC_XFER_MODE_MAP
++#define CONF_HC_XFER_MODE_DMA	HC_XFER_MODE_DMA
++
++#define UEFC_BASE_ADDRESS 		0x43a00000
++#define UEFC_BASE_MAP_ADDR 		0x60000000
++#define UEFC_MAP_SIZE			0x00800000
++#define UEFC_TOP_MAP_ADDR 		(UEFC_BASE_MAP_ADDR + UEFC_MAP_SIZE)
++#define UEFC_BASE_EXT_DDR_ADDR	0x00000000
++#define DIR_IN  0
++#define DIR_OUT 1
++/* Default selection: Channel A, lun 0, Port 0 */
++#define UEFC_CH_LUN_PORT 		HC_CTRL_CH_LUN_PORT(A, 0, 0)
++
++#define MXIC_RD32(_reg) \
++	(*(volatile uint32_t *)(_reg))
++#define MXIC_WR32(_val, _reg) \
++	((*(uint32_t *)((_reg))) = (_val))
++#define UPDATE_WRITE(_mask, _value, _reg) \
++	MXIC_WR32(((_value) | (MXIC_RD32(_reg) & ~(_mask))), (_reg))
++
++#define MSPI_MAX_FREQ        48000000
++#define MSPI_MAX_DEVICE      2
++#define MSPI_TIMEOUT_US      1000000
++#define PWRCTRL_MAX_WAIT_US  5
++#define MSPI_BUSY            BIT(2)
++
++struct mspi_context {
++	const struct mspi_dev_id      *owner;
++
++	struct mspi_xfer              xfer;
++
++	mspi_callback_handler_t       callback;
++	struct mspi_callback_context  *callback_ctx;
++	bool asynchronous;
++
++	struct k_sem lock;
++};
++
++
+diff --git a/drivers/spi/CMakeLists.txt b/drivers/spi/CMakeLists.txt
+index b2eb407f9b7..4d1c2ae08f6 100644
+--- a/drivers/spi/CMakeLists.txt
++++ b/drivers/spi/CMakeLists.txt
+@@ -4,10 +4,58 @@ zephyr_syscall_header(${ZEPHYR_BASE}/include/zephyr/drivers/spi.h)
+ 
+ zephyr_library()
+ 
+-# zephyr-keep-sorted-start
+-zephyr_library_sources_ifdef(CONFIG_SPI_ASYNC spi_signal.c)
++zephyr_library_sources_ifdef(CONFIG_SPI_SHELL  spi_shell.c)
++zephyr_library_sources_ifdef(CONFIG_SPI_TELINK_B91  spi_b91.c)
++zephyr_library_sources_ifdef(CONFIG_SPI_CC13XX_CC26XX		spi_cc13xx_cc26xx.c)
++zephyr_library_sources_ifdef(CONFIG_SPI_DW		spi_dw.c)
++zephyr_library_sources_ifdef(CONFIG_SPI_EMUL		spi_emul.c)
++zephyr_library_sources_ifdef(CONFIG_SPI_STM32		spi_ll_stm32.c)
++zephyr_library_sources_ifdef(CONFIG_SPI_MCUX_DSPI	spi_mcux_dspi.c)
++zephyr_library_sources_ifdef(CONFIG_SPI_MXIC_UEFC		mxic_uefc.c)
++zephyr_library_sources_ifdef(CONFIG_SPI_MCUX_ECSPI	spi_mcux_ecspi.c)
++zephyr_library_sources_ifdef(CONFIG_SPI_MCUX_FLEXCOMM	spi_mcux_flexcomm.c)
++zephyr_library_sources_ifdef(CONFIG_SPI_MCUX_FLEXIO	spi_mcux_flexio.c)
++zephyr_library_sources_ifdef(CONFIG_SPI_MCUX_LPSPI	spi_mcux_lpspi.c)
++zephyr_library_sources_ifdef(CONFIG_SPI_SAM		spi_sam.c)
++zephyr_library_sources_ifdef(CONFIG_SPI_SAM0		spi_sam0.c)
++zephyr_library_sources_ifdef(CONFIG_SPI_SIFIVE		spi_sifive.c)
++zephyr_library_sources_ifdef(CONFIG_SPI_RV32M1_LPSPI	spi_rv32m1_lpspi.c)
++zephyr_library_sources_ifdef(CONFIG_SPI_NRFX_SPI	spi_nrfx_spi.c
++							spi_nrfx_common.c)
++zephyr_library_sources_ifdef(CONFIG_SPI_NRFX_SPIM	spi_nrfx_spim.c
++							spi_nrfx_common.c)
++zephyr_library_sources_ifdef(CONFIG_SPI_NRFX_SPIS	spi_nrfx_spis.c)
++zephyr_library_sources_ifdef(CONFIG_SPI_LITEX		spi_litex.c)
++zephyr_library_sources_ifdef(CONFIG_SPI_LITEX_LITESPI	spi_litex_litespi.c)
++zephyr_library_sources_ifdef(CONFIG_SPI_OC_SIMPLE	spi_oc_simple.c)
++zephyr_library_sources_ifdef(CONFIG_SPI_XEC_QMSPI	spi_xec_qmspi.c)
++zephyr_library_sources_ifdef(CONFIG_SPI_GECKO_USART		spi_gecko_usart.c)
++zephyr_library_sources_ifdef(CONFIG_SPI_GECKO_EUSART	spi_gecko_eusart.c)
++zephyr_library_sources_ifdef(CONFIG_SPI_XLNX_AXI_QUADSPI spi_xlnx_axi_quadspi.c)
++zephyr_library_sources_ifdef(CONFIG_ESP32_SPIM		spi_esp32_spim.c)
++zephyr_library_sources_ifdef(CONFIG_SPI_TEST		spi_test.c)
++zephyr_library_sources_ifdef(CONFIG_SPI_PSOC6		spi_psoc6.c)
++zephyr_library_sources_ifdef(CONFIG_SPI_BITBANG		spi_bitbang.c)
++zephyr_library_sources_ifdef(CONFIG_SPI_XEC_QMSPI_LDMA	spi_xec_qmspi_ldma.c)
++zephyr_library_sources_ifdef(CONFIG_SPI_GD32		spi_gd32.c)
++zephyr_library_sources_ifdef(CONFIG_SPI_MCHP_QSPI	spi_mchp_mss_qspi.c)
++zephyr_library_sources_ifdef(CONFIG_SPI_PL022		spi_pl022.c)
++zephyr_library_sources_ifdef(CONFIG_SPI_ANDES_ATCSPI200	spi_andes_atcspi200.c)
++zephyr_library_sources_ifdef(CONFIG_NXP_S32_SPI spi_nxp_s32.c)
++zephyr_library_sources_ifdef(CONFIG_SPI_XMC4XXX     spi_xmc4xxx.c)
++zephyr_library_sources_ifdef(CONFIG_SPI_PW		spi_pw.c)
++zephyr_library_sources_ifdef(CONFIG_SPI_SMARTBOND   spi_smartbond.c)
++zephyr_library_sources_ifdef(CONFIG_SPI_OPENTITAN	spi_opentitan.c)
++zephyr_library_sources_ifdef(CONFIG_SPI_NUMAKER		spi_numaker.c)
++zephyr_library_sources_ifdef(CONFIG_SPI_AMBIQ_SPIC	spi_ambiq_spic.c)
++zephyr_library_sources_ifdef(CONFIG_SPI_AMBIQ_SPID	spi_ambiq_spid.c)
++zephyr_library_sources_ifdef(CONFIG_SPI_AMBIQ_BLEIF	spi_ambiq_bleif.c)
++zephyr_library_sources_ifdef(CONFIG_SPI_RPI_PICO_PIO	spi_rpi_pico_pio.c)
++zephyr_library_sources_ifdef(CONFIG_SPI_MCHP_MSS	spi_mchp_mss.c)
++zephyr_library_sources_ifdef(CONFIG_SPI_RENESAS_RA8  spi_b_renesas_ra8.c)
++zephyr_library_sources_ifdef(CONFIG_SPI_RENESAS_RA        spi_renesas_ra.c)
+ zephyr_library_sources_ifdef(CONFIG_SPI_RTIO spi_rtio.c)
+-zephyr_library_sources_ifdef(CONFIG_SPI_SHELL spi_shell.c)
++zephyr_library_sources_ifdef(CONFIG_SPI_ASYNC spi_signal.c)
+ zephyr_library_sources_ifdef(CONFIG_USERSPACE spi_handlers.c)
+ # zephyr-keep-sorted-stop
+ 
+diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
+index 7c3aaca7248..ef363432ab9 100644
+--- a/drivers/spi/Kconfig
++++ b/drivers/spi/Kconfig
+@@ -145,4 +145,6 @@ source "drivers/spi/Kconfig.xmc4xxx"
+ source "drivers/spi/spi_nxp_lpspi/Kconfig"
+ # zephyr-keep-sorted-stop
+ 
++source "drivers/spi/Kconfig.mxic"
++
+ endif # SPI
+diff --git a/drivers/spi/Kconfig.mxic b/drivers/spi/Kconfig.mxic
+new file mode 100644
+index 00000000000..6184c16f0fa
+--- /dev/null
++++ b/drivers/spi/Kconfig.mxic
+@@ -0,0 +1,12 @@
++# STM32 SPI driver configuration options
++
++# Copyright (c) 2015-2016 Intel Corporation
++# SPDX-License-Identifier: Apache-2.0
++
++menuconfig SPI_MXIC_UEFC
++	bool "MXIC UEFC controller driver"
++	default y
++	help
++	  Enable SPI support on the STM32 family of processors.
++
++
+diff --git a/dts/arm/xilinx/zynq7000.dtsi b/dts/arm/xilinx/zynq7000.dtsi
+index cbbc8eecaba..34668901ccc 100644
+--- a/dts/arm/xilinx/zynq7000.dtsi
++++ b/dts/arm/xilinx/zynq7000.dtsi
+@@ -102,6 +102,14 @@
+ 			full-duplex;
+ 		};
+ 
++		spi0: spi@43a00000 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "okay";
++			reg = <0x43a00000 0x10000>;
++			compatible = "xlnx,mspi-controller";
++		};
++
+ 		uart0: uart@e0000000 {
+ 			compatible = "xlnx,xuartps";
+ 			status = "disabled";
+diff --git a/dts/bindings/mspi/xlnx,mspi-controller.yaml b/dts/bindings/mspi/xlnx,mspi-controller.yaml
+new file mode 100644
+index 00000000000..dd220d7499c
+--- /dev/null
++++ b/dts/bindings/mspi/xlnx,mspi-controller.yaml
+@@ -0,0 +1,25 @@
++# Copyright (c) 2018, I-SENSE group of ICCS
++# SPDX-License-Identifier: Apache-2.0
++
++description: xlnx uefc MSPI controller
++
++bus: mspi
++
++compatible: "xlnx,mspi-controller"
++
++include: [mspi-controller.yaml, pinctrl-device.yaml]
++
++properties:
++  reg:
++    required: true
++  clock-frequency:
++    type: int
++    description: |
++      Clock frequency the SPI peripheral is being driven at, in Hz.
++  "#address-cells":
++    required: true
++    const: 1
++  "#size-cells":
++    required: true
++    const: 0
++
+diff --git a/dts/bindings/mtd/jedec,spi-nand.yaml b/dts/bindings/mtd/jedec,spi-nand.yaml
+new file mode 100644
+index 00000000000..748280e9b97
+--- /dev/null
++++ b/dts/bindings/mtd/jedec,spi-nand.yaml
+@@ -0,0 +1,47 @@
++# Copyright (c) 2022-2025 Macronix International Co., Ltd.
++# SPDX-License-Identifier: Apache-2.0
++
++description: |
++    STM32 SPI Flash controller supporting the JEDEC CFI interface
++
++    Representation of a serial nand flash on a spi bus:
++
++        mx31lf1ge4bc: spi-nand-flash@0 {
++                compatible = "jedec,spi-nand";
++                reg = <0>;
++                spi-max-frequency = <80000000>;
++                size = <0x4000000>;
++                status = "okay";
++        };
++
++compatible: "jedec,spi-nand"
++
++include: "spi-device.yaml"
++
++on-bus: spi
++
++properties:
++  reg:
++    required: true
++  spi-max-frequency:
++    type: int
++    required: true
++    description: Maximum clock frequency of device's SPI interface in Hz
++  size:
++    type: int
++    required: true
++  block-size:
++    type: int
++    required: true
++  page-size:
++    type: int
++    required: true
++  id:
++    type: uint8-array
++    required: true
++  cs_wait_delay:
++    type: int
++    required: true
++  support_conti_read:
++    type: int
++    required: true
+diff --git a/dts/bindings/spi/xlnx,mxic-uefc-spi.yaml b/dts/bindings/spi/xlnx,mxic-uefc-spi.yaml
+new file mode 100644
+index 00000000000..35885de3237
+--- /dev/null
++++ b/dts/bindings/spi/xlnx,mxic-uefc-spi.yaml
+@@ -0,0 +1,25 @@
++# Copyright (c) 2018, I-SENSE group of ICCS
++# SPDX-License-Identifier: Apache-2.0
++
++description: xlnx uefc SPI controller
++
++bus: spi
++
++compatible: "xlnx,mxic-uefc-spi"
++
++include: base.yaml
++
++properties:
++  reg:
++    required: true
++  clock-frequency:
++    type: int
++    description: |
++      Clock frequency the SPI peripheral is being driven at, in Hz.
++  "#address-cells":
++    required: true
++    const: 1
++  "#size-cells":
++    required: true
++    const: 0
++
+diff --git a/include/zephyr/pm/device.h b/include/zephyr/pm/device.h
+index f7c008f3cf2..1488ee390b1 100644
+--- a/include/zephyr/pm/device.h
++++ b/include/zephyr/pm/device.h
+@@ -716,13 +716,13 @@ static inline bool pm_device_is_powered(const struct device *dev)
+ static inline int pm_device_driver_init(const struct device *dev, pm_device_action_cb_t action_cb)
+ {
+ 	int rc;
+-
++	printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
+ 	/* When power management is not enabled, all drivers should initialise to active state */
+ 	rc = action_cb(dev, PM_DEVICE_ACTION_TURN_ON);
+ 	if ((rc < 0) && (rc != -ENOTSUP)) {
+ 		return rc;
+ 	}
+-
++	printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
+ 	rc = action_cb(dev, PM_DEVICE_ACTION_RESUME);
+ 	if (rc < 0) {
+ 		return rc;
+diff --git a/include/zephyr/sys/device_mmio.h b/include/zephyr/sys/device_mmio.h
+index e6971c96ebe..6975715a701 100644
+--- a/include/zephyr/sys/device_mmio.h
++++ b/include/zephyr/sys/device_mmio.h
+@@ -101,15 +101,24 @@ static inline void device_map(mm_reg_t *virt_addr, uintptr_t phys_addr,
+ 	/* Pass along flags and add that we want supervisor mode
+ 	 * read-write access.
+ 	 */
++	printf ("***[%s], [%s], [%04d],phys_addr ix %x, size is %x\r\n", __FILE__, __func__, __LINE__, phys_addr, size);
++	printf ("***[%s], [%s], [%04d],*virt_addr is %x \r\n", __FILE__, __func__, __LINE__, *virt_addr);
++
+ 	k_mem_map_phys_bare((uint8_t **)virt_addr, phys_addr, size,
+ 			    flags | K_MEM_PERM_RW);
++				 		printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
++
+ #else
+ 	ARG_UNUSED(size);
+ 	ARG_UNUSED(flags);
+ #ifdef CONFIG_EXTERNAL_ADDRESS_TRANSLATION
+ 	sys_mm_drv_page_phys_get((void *) phys_addr, virt_addr);
+ #else
++ 		printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
++
+ 	*virt_addr = phys_addr;
++	 		printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
++
+ #endif /* CONFIG_EXTERNAL_ADDRESS_TRANSLATION */
+ #endif /* CONFIG_MMU */
+ }
+diff --git a/kernel/mmu.c b/kernel/mmu.c
+index 617b02997dd..705f3793078 100644
+--- a/kernel/mmu.c
++++ b/kernel/mmu.c
+@@ -292,11 +292,11 @@ static void *virt_region_alloc(size_t size, size_t align)
+ 	size_t offset;
+ 	size_t num_bits;
+ 	int ret;
+-
++printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
+ 	if (unlikely(!virt_region_inited)) {
+ 		virt_region_init();
+ 	}
+-
++printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
+ 	/* Possibly request more pages to ensure we can get an aligned virtual address */
+ 	num_bits = (size + align - CONFIG_MMU_PAGE_SIZE) / CONFIG_MMU_PAGE_SIZE;
+ 	alloc_size = num_bits * CONFIG_MMU_PAGE_SIZE;
+@@ -306,13 +306,13 @@ static void *virt_region_alloc(size_t size, size_t align)
+ 			size);
+ 		return NULL;
+ 	}
+-
++printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
+ 	/* Remember that bit #0 in bitmap corresponds to the highest
+ 	 * virtual address. So here we need to go downwards (backwards?)
+ 	 * to get the starting address of the allocated region.
+ 	 */
+ 	dest_addr = virt_from_bitmap_offset(offset, alloc_size);
+-
++printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
+ 	if (alloc_size > size) {
+ 		uintptr_t aligned_dest_addr = ROUND_UP(dest_addr, align);
+ 
+@@ -354,16 +354,16 @@ static void *virt_region_alloc(size_t size, size_t align)
+ 			virt_region_free(UINT_TO_POINTER(aligned_dest_addr + size),
+ 					 (dest_addr + alloc_size) - (aligned_dest_addr + size));
+ 		}
+-
++printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
+ 		dest_addr = aligned_dest_addr;
+ 	}
+-
++printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
+ 	/* Need to make sure this does not step into kernel memory */
+ 	if (dest_addr < POINTER_TO_UINT(Z_VIRT_REGION_START_ADDR)) {
+ 		(void)sys_bitarray_free(&virt_region_bitmap, size, offset);
+ 		return NULL;
+ 	}
+-
++printf ("***[%s], [%s], [%04d], dest_addr is %x \r\n", __FILE__, __func__, __LINE__, dest_addr);
+ 	return UINT_TO_POINTER(dest_addr);
+ }
+ 
+@@ -907,15 +907,11 @@ void k_mem_map_phys_bare(uint8_t **virt_ptr, uintptr_t phys, size_t size, uint32
+ 	__ASSERT(aligned_phys < (aligned_phys + (aligned_size - 1)),
+ 		 "wraparound for physical address 0x%lx (size %zu)",
+ 		 aligned_phys, aligned_size);
+-
+ 	align_boundary = arch_virt_region_align(aligned_phys, aligned_size);
+-
+ 	key = k_spin_lock(&z_mm_lock);
+-
+ 	if (IS_ENABLED(CONFIG_KERNEL_DIRECT_MAP) &&
+ 	    (flags & K_MEM_DIRECT_MAP)) {
+ 		dest_addr = (uint8_t *)aligned_phys;
+-
+ 		/* Mark the region of virtual memory bitmap as used
+ 		 * if the region overlaps the virtual memory space.
+ 		 *
+@@ -929,13 +925,15 @@ void k_mem_map_phys_bare(uint8_t **virt_ptr, uintptr_t phys, size_t size, uint32
+ 		    IN_RANGE(aligned_phys + aligned_size - 1,
+ 			      (uintptr_t)K_MEM_VIRT_RAM_START,
+ 			      (uintptr_t)(K_MEM_VIRT_RAM_END - 1))) {
++					printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
+ 			uint8_t *adjusted_start = MAX(dest_addr, K_MEM_VIRT_RAM_START);
+ 			uint8_t *adjusted_end = MIN(dest_addr + aligned_size,
+ 						    K_MEM_VIRT_RAM_END);
+ 			size_t adjusted_sz = adjusted_end - adjusted_start;
+-
++		printf ("***[%s], [%s], [%04d], dest_addr is %x, addr_offset is %x\r\n", __FILE__, __func__, __LINE__, dest_addr, addr_offset);
+ 			num_bits = adjusted_sz / CONFIG_MMU_PAGE_SIZE;
+ 			offset = virt_to_bitmap_offset(adjusted_start, adjusted_sz);
++			printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
+ 			if (sys_bitarray_test_and_set_region(
+ 			    &virt_region_bitmap, num_bits, offset, true)) {
+ 				goto fail;
+@@ -944,6 +942,7 @@ void k_mem_map_phys_bare(uint8_t **virt_ptr, uintptr_t phys, size_t size, uint32
+ 	} else {
+ 		/* Obtain an appropriately sized chunk of virtual memory */
+ 		dest_addr = virt_region_alloc(aligned_size, align_boundary);
++
+ 		if (!dest_addr) {
+ 			goto fail;
+ 		}
+@@ -959,9 +958,11 @@ void k_mem_map_phys_bare(uint8_t **virt_ptr, uintptr_t phys, size_t size, uint32
+ 		aligned_phys, aligned_size, flags, addr_offset);
+ 
+ 	arch_mem_map(dest_addr, aligned_phys, aligned_size, flags);
++
+ 	k_spin_unlock(&z_mm_lock, key);
+ 
+ 	*virt_ptr = dest_addr + addr_offset;
++
+ 	return;
+ fail:
+ 	/* May re-visit this in the future, but for now running out of
+@@ -971,6 +972,8 @@ fail:
+ 	 * Other problems not related to resource exhaustion we leave as
+ 	 * assertions since they are clearly programming mistakes.
+ 	 */
++			printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
++
+ 	LOG_ERR("memory mapping 0x%lx (size %zu, flags 0x%x) failed",
+ 		phys, size, flags);
+ 	k_panic();
+diff --git a/samples/basic/blinky/src/main.c b/samples/basic/blinky/src/main.c
+index 4cab4969d94..45953d25c04 100644
+--- a/samples/basic/blinky/src/main.c
++++ b/samples/basic/blinky/src/main.c
+@@ -41,7 +41,7 @@ int main(void)
+ 		}
+ 
+ 		led_state = !led_state;
+-		printf("LED state: %s\n", led_state ? "ON" : "OFF");
++		// printf("LED state: %s\n", led_state ? "ON" : "OFF");
+ 		k_msleep(SLEEP_TIME_MS);
+ 	}
+ 	return 0;
+diff --git a/samples/drivers/mspi/mspi_flash/boards/zybo.conf b/samples/drivers/mspi/mspi_flash/boards/zybo.conf
+new file mode 100644
+index 00000000000..50f6eb7c568
+--- /dev/null
++++ b/samples/drivers/mspi/mspi_flash/boards/zybo.conf
+@@ -0,0 +1,5 @@
++CONFIG_MAIN_STACK_SIZE=4096
++CONFIG_LOG=y
++CONFIG_LOG_DEFAULT_LEVEL=0
++CONFIG_MSPI_INIT_PRIORITY=40
++CONFIG_FLASH_INIT_PRIORITY=50
+\ No newline at end of file
+diff --git a/samples/drivers/mspi/mspi_flash/boards/zybo.overlay b/samples/drivers/mspi/mspi_flash/boards/zybo.overlay
+new file mode 100644
+index 00000000000..058931098f5
+--- /dev/null
++++ b/samples/drivers/mspi/mspi_flash/boards/zybo.overlay
+@@ -0,0 +1,27 @@
++/*
++ * Copyright (c) 2022 STMicroelectronics
++ *
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++ &spi0{
++	status = "okay";
++	clock-frequency = <50000000>;
++	mx25r6435f: mx25r6435f@0 {
++		compatible = "jedec,mspi-nor";
++		reg = <0>;
++		jedec-id = [c2 80 3C];
++		size = <67108864>;
++		t-enter-dpd = <10000>;
++		t-exit-dpd = <30000>;
++		mspi-max-frequency = <50000000>;
++		mspi-io-mode = "MSPI_IO_MODE_OCTAL";
++		mspi-data-rate = "MSPI_DATA_RATE_SINGLE";
++		mspi-hardware-ce-num = <1>;
++		mspi-cpp-mode = "MSPI_CPP_MODE_0";
++		mspi-endian = "MSPI_BIG_ENDIAN";
++		mspi-ce-polarity = "MSPI_CE_ACTIVE_LOW";
++		status = "okay";
++		zephyr,deferred-init;
++	};
++};
+\ No newline at end of file
+diff --git a/samples/drivers/mspi/mspi_flash/src/main.c b/samples/drivers/mspi/mspi_flash/src/main.c
+index 27efefa8af2..823d480e75b 100644
+--- a/samples/drivers/mspi/mspi_flash/src/main.c
++++ b/samples/drivers/mspi/mspi_flash/src/main.c
+@@ -11,6 +11,12 @@
+ #include <stdio.h>
+ #include <string.h>
+ 
++#if DT_HAS_COMPAT_STATUS_OKAY(xlnx_mspi_controller)
++#define XLNX_MSPI_COMPAT xlnx_mspi_controller
++#else
++#define XLNX_MSPI_COMPAT invalid
++#endif
++
+ #define SPI_FLASH_TEST_REGION_OFFSET 0xff000
+ 
+ #define SPI_FLASH_SECTOR_SIZE        4096
+@@ -166,24 +172,64 @@ int multi_sector_test(const struct device *flash_dev)
+ 
+ int main(void)
+ {
+-	const struct device *flash_dev = DEVICE_DT_GET(DT_ALIAS(flash0));
++ 	printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
+ 
+-	if (!device_is_ready(flash_dev)) {
+-		printk("%s: device not ready.\n", flash_dev->name);
+-		return 1;
++	const struct device *mspi_dev = DEVICE_DT_GET_ONE(XLNX_MSPI_COMPAT);
++	printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
++
++	if (!mspi_dev) {
++ 		printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
++		return;
+ 	}
++	printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
+ 
+-	printf("\n%s SPI flash testing\n", flash_dev->name);
+-	printf("==========================\n");
++	device_init(mspi_dev);
+ 
+-	if (single_sector_test(flash_dev)) {
+-		return 1;
++	const struct device *flash_dev = DEVICE_DT_GET_ONE(jedec_mspi_nor);
++	printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
++
++	if (!flash_dev) {
++ 		printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
++		return;
+ 	}
+-#if defined SPI_FLASH_MULTI_SECTOR_TEST
+-	if (multi_sector_test(flash_dev)) {
+-		return 1;
++
++	printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
++
++	device_init(flash_dev);
++
++	if (!device_is_ready(flash_dev)) {
++		printk("%s: device not ready.\n", flash_dev->name);
++		return 0;
+ 	}
+-#endif
+-	printf("==========================\n");
++
++// 	printf("\n%s SPI flash testing\n", flash_dev->name);
++// 	printf("==========================\n");
++
++	// single_sector_test(flash_dev);
++// #if defined SPI_FLASH_MULTI_SECTOR_TEST
++// 	multi_sector_test(flash_dev);
++// #endif
+ 	return 0;
++
++
++// 	const struct device *flash_dev = DEVICE_DT_GET(DT_ALIAS(flash0));
++
++// 	if (!device_is_ready(flash_dev)) {
++// 		printk("%s: device not ready.\n", flash_dev->name);
++// 		return 1;
++// 	}
++
++// 	printf("\n%s SPI flash testing\n", flash_dev->name);
++// 	printf("==========================\n");
++
++// 	if (single_sector_test(flash_dev)) {
++// 		return 1;
++// 	}
++// #if defined SPI_FLASH_MULTI_SECTOR_TEST
++// 	if (multi_sector_test(flash_dev)) {
++// 		return 1;
++// 	}
++// #endif
++// 	printf("==========================\n");
++// 	return 0;
+ }
+diff --git a/samples/drivers/spi_flash/prj.conf b/samples/drivers/spi_flash/prj.conf
+index d78e334e0fb..a27fadc4a68 100644
+--- a/samples/drivers/spi_flash/prj.conf
++++ b/samples/drivers/spi_flash/prj.conf
+@@ -1,2 +1,3 @@
+ CONFIG_STDOUT_CONSOLE=y
+ CONFIG_FLASH=y
++CONFIG_FLASH_MSPI_NOR=y
+\ No newline at end of file
+diff --git a/samples/drivers/spi_flash/src/main.c b/samples/drivers/spi_flash/src/main.c
+index 52e8b6062b5..ffeb82b33cb 100644
+--- a/samples/drivers/spi_flash/src/main.c
++++ b/samples/drivers/spi_flash/src/main.c
+@@ -11,115 +11,128 @@
+ #include <stdio.h>
+ #include <string.h>
+ 
+-#if defined(CONFIG_BOARD_ADAFRUIT_FEATHER_STM32F405)
+-#define SPI_FLASH_TEST_REGION_OFFSET 0xf000
+-#elif defined(CONFIG_BOARD_ARTY_A7_DESIGNSTART_FPGA_CORTEX_M1) || \
+-	defined(CONFIG_BOARD_ARTY_A7_DESIGNSTART_FPGA_CORTEX_M3)
+-/* The FPGA bitstream is stored in the lower 536 sectors of the flash. */
+-#define SPI_FLASH_TEST_REGION_OFFSET \
+-	DT_REG_SIZE(DT_NODE_BY_FIXED_PARTITION_LABEL(fpga_bitstream))
+-#elif defined(CONFIG_BOARD_NPCX9M6F_EVB) || \
+-	defined(CONFIG_BOARD_NPCX7M6FB_EVB)
+-#define SPI_FLASH_TEST_REGION_OFFSET 0x7F000
++#if DT_HAS_COMPAT_STATUS_OKAY(xlnx_mspi_controller)
++#define XLNX_MSPI_COMPAT xlnx_mspi_controller
+ #else
+-#define SPI_FLASH_TEST_REGION_OFFSET 0xff000
++#define XLNX_MSPI_COMPAT invalid
+ #endif
+-#define SPI_FLASH_SECTOR_SIZE        4096
+ 
+-#if defined(CONFIG_FLASH_STM32_OSPI) || \
+-	defined(CONFIG_FLASH_STM32_QSPI) || \
+-	defined(CONFIG_FLASH_STM32_XSPI)
+-#define SPI_FLASH_MULTI_SECTOR_TEST
+-#endif
++// #if defined(CONFIG_BOARD_ADAFRUIT_FEATHER_STM32F405)
++// #define SPI_FLASH_TEST_REGION_OFFSET 0xf000
++// #elif defined(CONFIG_BOARD_ARTY_A7_DESIGNSTART_FPGA_CORTEX_M1) || \
++// 	defined(CONFIG_BOARD_ARTY_A7_DESIGNSTART_FPGA_CORTEX_M3)
++// /* The FPGA bitstream is stored in the lower 536 sectors of the flash. */
++// #define SPI_FLASH_TEST_REGION_OFFSET \
++// 	DT_REG_SIZE(DT_NODE_BY_FIXED_PARTITION_LABEL(fpga_bitstream))
++// #elif defined(CONFIG_BOARD_NPCX9M6F_EVB) || \
++// 	defined(CONFIG_BOARD_NPCX7M6FB_EVB)
++// #define SPI_FLASH_TEST_REGION_OFFSET 0x7F000
++// #else
++// #define SPI_FLASH_TEST_REGION_OFFSET 0x0FF000
++// #endif
++// #define SPI_FLASH_SECTOR_SIZE        4096
+ 
+-#if DT_HAS_COMPAT_STATUS_OKAY(jedec_spi_nor)
+-#define SPI_FLASH_COMPAT jedec_spi_nor
+-#elif DT_HAS_COMPAT_STATUS_OKAY(jedec_mspi_nor)
+-#define SPI_FLASH_COMPAT jedec_mspi_nor
+-#elif DT_HAS_COMPAT_STATUS_OKAY(st_stm32_qspi_nor)
+-#define SPI_FLASH_COMPAT st_stm32_qspi_nor
+-#elif DT_HAS_COMPAT_STATUS_OKAY(st_stm32_ospi_nor)
+-#define SPI_FLASH_COMPAT st_stm32_ospi_nor
+-#elif DT_HAS_COMPAT_STATUS_OKAY(st_stm32_xspi_nor)
+-#define SPI_FLASH_COMPAT st_stm32_xspi_nor
+-#elif DT_HAS_COMPAT_STATUS_OKAY(nordic_qspi_nor)
+-#define SPI_FLASH_COMPAT nordic_qspi_nor
+-#else
+-#define SPI_FLASH_COMPAT invalid
+-#endif
++// #if defined(CONFIG_FLASH_STM32_OSPI) || \
++// 	defined(CONFIG_FLASH_STM32_QSPI) || \
++// 	defined(CONFIG_FLASH_STM32_XSPI)
++// #define SPI_FLASH_MULTI_SECTOR_TEST
++// #endif
+ 
+-const uint8_t erased[] = { 0xff, 0xff, 0xff, 0xff };
++// #if DT_HAS_COMPAT_STATUS_OKAY(jedec_spi_nor)
++// #define SPI_FLASH_COMPAT jedec_spi_nor
++// #elif DT_HAS_COMPAT_STATUS_OKAY(jedec_mspi_nor)
++// #define SPI_FLASH_COMPAT jedec_mspi_nor
++// #elif DT_HAS_COMPAT_STATUS_OKAY(st_stm32_qspi_nor)
++// #define SPI_FLASH_COMPAT st_stm32_qspi_nor
++// #elif DT_HAS_COMPAT_STATUS_OKAY(st_stm32_ospi_nor)
++// #define SPI_FLASH_COMPAT st_stm32_ospi_nor
++// #elif DT_HAS_COMPAT_STATUS_OKAY(st_stm32_xspi_nor)
++// #define SPI_FLASH_COMPAT st_stm32_xspi_nor
++// #elif DT_HAS_COMPAT_STATUS_OKAY(nordic_qspi_nor)
++// #define SPI_FLASH_COMPAT nordic_qspi_nor
++// #else
++// #define SPI_FLASH_COMPAT invalid
++// #endif
+ 
+-void single_sector_test(const struct device *flash_dev)
+-{
+-	const uint8_t expected[] = { 0x55, 0xaa, 0x66, 0x99 };
+-	const size_t len = sizeof(expected);
+-	uint8_t buf[sizeof(expected)];
+-	int rc;
++// const uint8_t erased[] = { 0xff, 0xff, 0xff, 0xff };
+ 
+-	printf("\nPerform test on single sector");
+-	/* Write protection needs to be disabled before each write or
+-	 * erase, since the flash component turns on write protection
+-	 * automatically after completion of write and erase
+-	 * operations.
+-	 */
+-	printf("\nTest 1: Flash erase\n");
++// void single_sector_test(const struct device *flash_dev)
++// {
++// 	const uint8_t expected[] = { 0x55, 0xaa, 0x66, 0x99 };
++// 	const size_t len = sizeof(expected);
++// 	uint8_t buf[sizeof(expected)];
++// 	int rc;
++// 	printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
+ 
+-	/* Full flash erase if SPI_FLASH_TEST_REGION_OFFSET = 0 and
+-	 * SPI_FLASH_SECTOR_SIZE = flash size
+-	 */
+-	rc = flash_erase(flash_dev, SPI_FLASH_TEST_REGION_OFFSET,
+-			 SPI_FLASH_SECTOR_SIZE);
+-	if (rc != 0) {
+-		printf("Flash erase failed! %d\n", rc);
+-	} else {
+-		/* Check erased pattern */
+-		memset(buf, 0, len);
+-		rc = flash_read(flash_dev, SPI_FLASH_TEST_REGION_OFFSET, buf, len);
+-		if (rc != 0) {
+-			printf("Flash read failed! %d\n", rc);
+-			return;
+-		}
+-		if (memcmp(erased, buf, len) != 0) {
+-			printf("Flash erase failed at offset 0x%x got 0x%x\n",
+-				SPI_FLASH_TEST_REGION_OFFSET, *(uint32_t *)buf);
+-			return;
+-		}
+-		printf("Flash erase succeeded!\n");
+-	}
+-	printf("\nTest 2: Flash write\n");
++// 	printf("\nPerform test on single sector");
++// 	/* Write protection needs to be disabled before each write or
++// 	 * erase, since the flash component turns on write protection
++// 	 * automatically after completion of write and erase
++// 	 * operations.
++// 	 */
++// 	printf("\nTest 1: Flash erase\n");
+ 
+-	printf("Attempting to write %zu bytes\n", len);
+-	rc = flash_write(flash_dev, SPI_FLASH_TEST_REGION_OFFSET, expected, len);
+-	if (rc != 0) {
+-		printf("Flash write failed! %d\n", rc);
+-		return;
+-	}
++// 	/* Full flash erase if SPI_FLASH_TEST_REGION_OFFSET = 0 and
++// 	 * SPI_FLASH_SECTOR_SIZE = flash size
++// 	 */
++// 	rc = flash_erase(flash_dev, SPI_FLASH_TEST_REGION_OFFSET,
++// 			 SPI_FLASH_SECTOR_SIZE);
++// 			 	printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
+ 
+-	memset(buf, 0, len);
+-	rc = flash_read(flash_dev, SPI_FLASH_TEST_REGION_OFFSET, buf, len);
+-	if (rc != 0) {
+-		printf("Flash read failed! %d\n", rc);
+-		return;
+-	}
++// 	if (rc != 0) {
++// 		printf("Flash erase failed! %d\n", rc);
++// 	} else {
++// 			printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
+ 
+-	if (memcmp(expected, buf, len) == 0) {
+-		printf("Data read matches data written. Good!!\n");
+-	} else {
+-		const uint8_t *wp = expected;
+-		const uint8_t *rp = buf;
+-		const uint8_t *rpe = rp + len;
+-
+-		printf("Data read does not match data written!!\n");
+-		while (rp < rpe) {
+-			printf("%08x wrote %02x read %02x %s\n",
+-			       (uint32_t)(SPI_FLASH_TEST_REGION_OFFSET + (rp - buf)),
+-			       *wp, *rp, (*rp == *wp) ? "match" : "MISMATCH");
+-			++rp;
+-			++wp;
+-		}
+-	}
+-}
++// 		/* Check erased pattern */
++// 		memset(buf, 0, len);
++// 		rc = flash_read(flash_dev, SPI_FLASH_TEST_REGION_OFFSET, buf, len);
++// 			printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
++
++// 		if (rc != 0) {
++// 			printf("Flash read failed! %d\n", rc);
++// 			return;
++// 		}
++// 		if (memcmp(erased, buf, len) != 0) {
++// 			printf("Flash erase failed at offset 0x%x got 0x%x\n",
++// 				SPI_FLASH_TEST_REGION_OFFSET, *(uint32_t *)buf);
++// 			return;
++// 		}
++// 		printf("Flash erase succeeded!\n");
++// 	}
++// 	printf("\nTest 2: Flash write\n");
++
++// 	printf("Attempting to write %zu bytes\n", len);
++// 	rc = flash_write(flash_dev, SPI_FLASH_TEST_REGION_OFFSET, expected, len);
++// 	if (rc != 0) {
++// 		printf("Flash write failed! %d\n", rc);
++// 		return;
++// 	}
++
++// 	memset(buf, 0, len);
++// 	rc = flash_read(flash_dev, SPI_FLASH_TEST_REGION_OFFSET, buf, len);
++// 	if (rc != 0) {
++// 		printf("Flash read failed! %d\n", rc);
++// 		return;
++// 	}
++
++// 	if (memcmp(expected, buf, len) == 0) {
++// 		printf("Data read matches data written. Good!!\n");
++// 	} else {
++// 		const uint8_t *wp = expected;
++// 		const uint8_t *rp = buf;
++// 		const uint8_t *rpe = rp + len;
++
++// 		printf("Data read does not match data written!!\n");
++// 		while (rp < rpe) {
++// 			printf("%08x wrote %02x read %02x %s\n",
++// 			       (uint32_t)(SPI_FLASH_TEST_REGION_OFFSET + (rp - buf)),
++// 			       *wp, *rp, (*rp == *wp) ? "match" : "MISMATCH");
++// 			++rp;
++// 			++wp;
++// 		}
++// 	}
++// }
+ 
+ #if defined SPI_FLASH_MULTI_SECTOR_TEST
+ void multi_sector_test(const struct device *flash_dev)
+@@ -208,19 +221,42 @@ void multi_sector_test(const struct device *flash_dev)
+ 
+ int main(void)
+ {
+-	const struct device *flash_dev = DEVICE_DT_GET_ONE(SPI_FLASH_COMPAT);
++ 	printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
++
++	const struct device *mspi_dev = DEVICE_DT_GET_ONE(XLNX_MSPI_COMPAT);
++	printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
++
++	if (!mspi_dev) {
++ 		printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
++		return;
++	}
++	printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
++
++	device_init(mspi_dev);
++
++	const struct device *flash_dev = DEVICE_DT_GET_ONE(jedec_mspi_nor);
++	printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
++
++	if (!flash_dev) {
++ 		printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
++		return;
++	}
++
++	printf ("***[%s], [%s], [%04d], \r\n", __FILE__, __func__, __LINE__);
++
++	device_init(flash_dev);
+ 
+ 	if (!device_is_ready(flash_dev)) {
+ 		printk("%s: device not ready.\n", flash_dev->name);
+ 		return 0;
+ 	}
+ 
+-	printf("\n%s SPI flash testing\n", flash_dev->name);
+-	printf("==========================\n");
++// 	printf("\n%s SPI flash testing\n", flash_dev->name);
++// 	printf("==========================\n");
+ 
+-	single_sector_test(flash_dev);
+-#if defined SPI_FLASH_MULTI_SECTOR_TEST
+-	multi_sector_test(flash_dev);
+-#endif
++	// single_sector_test(flash_dev);
++// #if defined SPI_FLASH_MULTI_SECTOR_TEST
++// 	multi_sector_test(flash_dev);
++// #endif
+ 	return 0;
+ }
+diff --git a/samples/drivers/spi_nand/CMakeLists.txt b/samples/drivers/spi_nand/CMakeLists.txt
+new file mode 100644
+index 00000000000..69534da7e32
+--- /dev/null
++++ b/samples/drivers/spi_nand/CMakeLists.txt
+@@ -0,0 +1,8 @@
++# SPDX-License-Identifier: Apache-2.0
++
++cmake_minimum_required(VERSION 3.13.1)
++find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
++project(spi_nand)
++
++FILE(GLOB app_sources src/*.c)
++target_sources(app PRIVATE ${app_sources})
+diff --git a/samples/drivers/spi_nand/README.rst b/samples/drivers/spi_nand/README.rst
+new file mode 100644
+index 00000000000..afcae84fbc6
+--- /dev/null
++++ b/samples/drivers/spi_nand/README.rst
+@@ -0,0 +1,43 @@
++.. zephyr:code-sample:: spi-nand
++   :name: JEDEC SPI-NAND flash
++   :relevant-api: flash_interface
++
++   Use the flash API to interact with an SPI NAND serial flash memory device.
++
++Overview
++********
++
++This sample demonstrates using the flash API on a SPI NAND serial flash
++memory device.  While trivial it is an example of direct access and
++allows confirmation that the flash is working.
++
++Building and Running
++********************
++
++The application will build only for a target that has a devicetree node with
++one of the following bindings as a compatible:
++
++* :dtcompatible:`jedec,spi-nand`.
++
++.. zephyr-app-commands::
++   :zephyr-app: samples/drivers/spi_nand
++   :board: stm32l562e_dk
++   :goals: build flash
++   :compact:
++
++Sample Output
++=============
++
++.. code-block:: console
++
++   *** Booting Zephyr OS build zephyr-v2.3.0-2142-gca01d2e1d748  ***
++
++   JEDEC QSPI-NAND SPI flash testing
++   ==========================
++
++   Test 1: Flash erase
++   Flash erase succeeded!
++
++   Test 2: Flash write
++   Attempting to write 4 bytes
++   Data read matches data written. Good!
+diff --git a/samples/drivers/spi_nand/boards/stm32l562e_dk.conf b/samples/drivers/spi_nand/boards/stm32l562e_dk.conf
+new file mode 100644
+index 00000000000..c503fcc098b
+--- /dev/null
++++ b/samples/drivers/spi_nand/boards/stm32l562e_dk.conf
+@@ -0,0 +1,11 @@
++#
++# Copyright (c) 2022-2025 Macronix International Co., Ltd.
++#
++# SPDX-License-Identifier: Apache-2.0
++#
++
++CONFIG_SPI=y
++CONFIG_SPI_NAND=y
++CONFIG_SPI_ASYNC=y
++CONFIG_SPI_LOG_LEVEL_INF=y
++CONFIG_SPI_STM32_DMA=y
+diff --git a/samples/drivers/spi_nand/boards/stm32l562e_dk.overlay b/samples/drivers/spi_nand/boards/stm32l562e_dk.overlay
+new file mode 100644
+index 00000000000..c1b68c29dd4
+--- /dev/null
++++ b/samples/drivers/spi_nand/boards/stm32l562e_dk.overlay
+@@ -0,0 +1,24 @@
++/*
++ * Copyright (c) 2022-2025 Macronix International Co., Ltd.
++ *
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++&spi3 {
++	pinctrl-0 = <&spi3_sck_pg9 &spi3_mosi_pb5 &spi3_miso_pb4>;
++	cs-gpios = <&gpioe 0 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>;
++	status = "okay";
++
++	mx31lf1ge4bc: spi_nand_flash@0 {
++		compatible = "jedec,spi-nand";
++		reg = <0>;
++		spi-max-frequency = <500000>;
++		size = <4194304>;
++		block-size = <2048>;
++		page-size = <2048>;
++		id = [c2 1E];
++		cs_wait_delay = <0>;
++		support_conti_read = <1>;
++		status = "okay";
++	};
++};
+diff --git a/samples/drivers/spi_nand/prj.conf b/samples/drivers/spi_nand/prj.conf
+new file mode 100644
+index 00000000000..34b8de131ad
+--- /dev/null
++++ b/samples/drivers/spi_nand/prj.conf
+@@ -0,0 +1,3 @@
++CONFIG_STDOUT_CONSOLE=y
++CONFIG_FLASH=y
++CONFIG_HEAP_MEM_POOL_SIZE=100000
+diff --git a/samples/drivers/spi_nand/sample.yaml b/samples/drivers/spi_nand/sample.yaml
+new file mode 100644
+index 00000000000..dc34582e417
+--- /dev/null
++++ b/samples/drivers/spi_nand/sample.yaml
+@@ -0,0 +1,17 @@
++sample:
++  name: SPI NAND Flash Sample
++tests:
++  sample.drivers.spi.nand.flash:
++    tags: spi nand
++    filter: dt_compat_enabled("jedec,spi-nand")
++    harness: console
++    harness_config:
++      type: multi_line
++      ordered: true
++      regex:
++        - "Test 1: Flash erase"
++        - "Flash erase succeeded!"
++        - "Test 2: Flash write"
++        - "Attempting to write 4 bytes"
++        - "Data read matches data written. Good!!"
++    depends_on: spi
+diff --git a/samples/drivers/spi_nand/src/main.c b/samples/drivers/spi_nand/src/main.c
+new file mode 100644
+index 00000000000..45ec21b4b9d
+--- /dev/null
++++ b/samples/drivers/spi_nand/src/main.c
+@@ -0,0 +1,207 @@
++/*
++ * Copyright (c) 2022-2025 Macronix International Co., Ltd.
++ *
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++#include <zephyr/kernel.h>
++#include <zephyr/drivers/flash.h>
++#include <zephyr/device.h>
++#include <zephyr/devicetree.h>
++#include <stdio.h>
++#include <string.h>
++
++#define SPI_NAND_TEST_REGION_OFFSET 0xff000
++#define SPI_NAND_BLOCK_SIZE         0x20000U
++
++#if defined(CONFIG_FLASH_STM32_OSPI) || defined(CONFIG_FLASH_STM32_QSPI) ||                        \
++	defined(CONFIG_FLASH_STM32_XSPI)
++#define SPI_NAND_MULTI_SECTOR_TEST
++#endif
++
++#if DT_HAS_COMPAT_STATUS_OKAY(jedec_spi_nand)
++#define SPI_NAND_COMPAT jedec_spi_nand
++#else
++#define SPI_NAND_COMPAT invalid
++#endif
++
++const uint8_t erased[] = {0xff, 0xff, 0xff, 0xff};
++
++void single_sector_test(const struct device *flash_dev)
++{
++	const uint8_t expected[] = {0x55, 0xaa, 0x66, 0x99};
++	const size_t len = sizeof(expected);
++	uint8_t buf[sizeof(expected)];
++	int rc;
++
++	printf("\nPerform test on single sector");
++	/* Write protection needs to be disabled before each write or
++	 * erase, since the flash component turns on write protection
++	 * automatically after completion of write and erase
++	 * operations.
++	 */
++	printf("\nTest 1: Flash erase\n");
++
++	/* Full flash erase if SPI_NAND_TEST_REGION_OFFSET = 0 and
++	 * SPI_NAND_BLOCK_SIZE = flash size
++	 */
++	rc = flash_erase(flash_dev, SPI_NAND_TEST_REGION_OFFSET, SPI_NAND_BLOCK_SIZE);
++	if (rc != 0) {
++		printf("Flash erase failed! %d\n", rc);
++	} else {
++		/* Check erased pattern */
++		memset(buf, 0, len);
++		rc = flash_read(flash_dev, SPI_NAND_TEST_REGION_OFFSET, buf, len);
++		if (rc != 0) {
++			printf("Flash read failed! %d\n", rc);
++			return;
++		}
++		if (memcmp(erased, buf, len) != 0) {
++			printf("Flash erase failed at offset 0x%x got 0x%x\n",
++			       SPI_NAND_TEST_REGION_OFFSET, *(uint32_t *)buf);
++			return;
++		}
++		printf("Flash erase succeeded!\n");
++	}
++	printf("\nTest 2: Flash write\n");
++
++	printf("Attempting to write %zu bytes\n", len);
++	rc = flash_write(flash_dev, SPI_NAND_TEST_REGION_OFFSET, expected, len);
++	if (rc != 0) {
++		printf("Flash write failed! %d\n", rc);
++		return;
++	}
++
++	memset(buf, 0, len);
++	rc = flash_read(flash_dev, SPI_NAND_TEST_REGION_OFFSET, buf, len);
++	if (rc != 0) {
++		printf("Flash read failed! %d\n", rc);
++		return;
++	}
++
++	if (memcmp(expected, buf, len) == 0) {
++		printf("Data read matches data written. Good!!\n");
++	} else {
++		const uint8_t *wp = expected;
++		const uint8_t *rp = buf;
++		const uint8_t *rpe = rp + len;
++
++		printf("Data read does not match data written!!\n");
++		while (rp < rpe) {
++			printf("%08x wrote %02x read %02x %s\n",
++			       (uint32_t)(SPI_NAND_TEST_REGION_OFFSET + (rp - buf)), *wp, *rp,
++			       (*rp == *wp) ? "match" : "MISMATCH");
++			++rp;
++			++wp;
++		}
++	}
++}
++
++#if defined SPI_NAND_MULTI_SECTOR_TEST
++void multi_sector_test(const struct device *flash_dev)
++{
++	const uint8_t expected[] = {0x55, 0xaa, 0x66, 0x99};
++	const size_t len = sizeof(expected);
++	uint8_t buf[sizeof(expected)];
++	int rc;
++
++	printf("\nPerform test on multiple consecutive sectors");
++
++	/* Write protection needs to be disabled before each write or
++	 * erase, since the flash component turns on write protection
++	 * automatically after completion of write and erase
++	 * operations.
++	 */
++	printf("\nTest 1: Flash erase\n");
++
++	/* Full flash erase if SPI_NAND_TEST_REGION_OFFSET = 0 and
++	 * SPI_NAND_BLOCK_SIZE = flash size
++	 * Erase 2 sectors for check for erase of consequtive sectors
++	 */
++	rc = flash_erase(flash_dev, SPI_NAND_TEST_REGION_OFFSET, SPI_NAND_BLOCK_SIZE * 2);
++	if (rc != 0) {
++		printf("Flash erase failed! %d\n", rc);
++	} else {
++		/* Read the content and check for erased */
++		memset(buf, 0, len);
++		size_t offs = SPI_NAND_TEST_REGION_OFFSET;
++
++		while (offs < SPI_NAND_TEST_REGION_OFFSET + 2 * SPI_NAND_BLOCK_SIZE) {
++			rc = flash_read(flash_dev, offs, buf, len);
++			if (rc != 0) {
++				printf("Flash read failed! %d\n", rc);
++				return;
++			}
++			if (memcmp(erased, buf, len) != 0) {
++				printf("Flash erase failed at offset 0x%x got 0x%x\n", offs,
++				       *(uint32_t *)buf);
++				return;
++			}
++			offs += SPI_NAND_BLOCK_SIZE;
++		}
++		printf("Flash erase succeeded!\n");
++	}
++
++	printf("\nTest 2: Flash write\n");
++
++	size_t offs = SPI_NAND_TEST_REGION_OFFSET;
++
++	while (offs < SPI_NAND_TEST_REGION_OFFSET + 2 * SPI_NAND_BLOCK_SIZE) {
++		printf("Attempting to write %zu bytes at offset 0x%x\n", len, offs);
++		rc = flash_write(flash_dev, offs, expected, len);
++		if (rc != 0) {
++			printf("Flash write failed! %d\n", rc);
++			return;
++		}
++
++		memset(buf, 0, len);
++		rc = flash_read(flash_dev, offs, buf, len);
++		if (rc != 0) {
++			printf("Flash read failed! %d\n", rc);
++			return;
++		}
++
++		if (memcmp(expected, buf, len) == 0) {
++			printf("Data read matches data written. Good!!\n");
++		} else {
++			const uint8_t *wp = expected;
++			const uint8_t *rp = buf;
++			const uint8_t *rpe = rp + len;
++
++			printf("Data read does not match data written!!\n");
++			while (rp < rpe) {
++				printf("%08x wrote %02x read %02x %s\n",
++				       (uint32_t)(offs + (rp - buf)), *wp, *rp,
++				       (*rp == *wp) ? "match" : "MISMATCH");
++				++rp;
++				++wp;
++			}
++		}
++		offs += SPI_NAND_BLOCK_SIZE;
++	}
++}
++#endif
++
++void main(void)
++{
++	static uint8_t expected[2048] = {0};
++	const size_t len = sizeof(expected);
++	static uint8_t buf[sizeof(expected)];
++	int rc;
++
++	const struct device *flash_dev = DEVICE_DT_GET_ONE(SPI_NAND_COMPAT);
++
++	if (!device_is_ready(flash_dev)) {
++		printk("%s: device not ready.\n", flash_dev->name);
++		return 0;
++	}
++
++	printf("\n%s SPI NAND flash testing\n", flash_dev->name);
++	printf("==========================\n");
++
++	single_sector_test(flash_dev);
++#if defined SPI_NAND_MULTI_SECTOR_TEST
++	multi_sector_test(flash_dev);
++#endif
++	return 0;
++}
+diff --git a/samples/hello_world/boards/zybo.overlay b/samples/hello_world/boards/zybo.overlay
+new file mode 100644
+index 00000000000..e69de29bb2d
