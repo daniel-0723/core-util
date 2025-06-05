@@ -1,0 +1,994 @@
+diff --git a/boards/arm/stm32l562e_dk/stm32l562e_dk_common.dtsi b/boards/arm/stm32l562e_dk/stm32l562e_dk_common.dtsi
+index 5bb8c567ee6..7a373ac0548 100644
+--- a/boards/arm/stm32l562e_dk/stm32l562e_dk_common.dtsi
++++ b/boards/arm/stm32l562e_dk/stm32l562e_dk_common.dtsi
+@@ -137,13 +137,14 @@
+ 	status = "okay";
+ 
+ 	mx25lm51245: ospi-nor-flash@0 {
+-		compatible = "st,stm32-ospi-nor";
++		compatible = "jedec,spi-nor";
++		label = "MX25LM51245";
+ 		reg = <0>;
+-		ospi-max-frequency = <DT_FREQ_M(50)>;
+-		size = <DT_SIZE_M(512)>; /* 64 MBytes */
+-		spi-bus-width = <OSPI_OPI_MODE>;
+-		data-rate = <OSPI_DTR_TRANSFER>;
+-		four-byte-opcodes;
++		spi-max-frequency = <DT_FREQ_M(50)>;
++		size = <DT_SIZE_M(64)>;
++                jedec-id = [c2 85 3a];
++                duplex = <0>;
++                frame-format = <0>;
+ 		status = "okay";
+ 		sfdp-bfp = [
+ 			53 46 44 50 06 01 02 ff
+diff --git a/drivers/flash/spi_nor.c b/drivers/flash/spi_nor.c
+index ea23d11eb95..fca955201e4 100644
+--- a/drivers/flash/spi_nor.c
++++ b/drivers/flash/spi_nor.c
+@@ -170,6 +170,14 @@ struct spi_nor_data {
+ #endif /* CONFIG_FLASH_PAGE_LAYOUT */
+ #endif /* CONFIG_SPI_NOR_SFDP_RUNTIME */
+ #endif /* CONFIG_SPI_NOR_SFDP_MINIMAL */
++
++#ifdef CONFIG_SPI_EXTENDED_MODES
++	enum spi_nor_protocol nor_protocol;
++
++	uint8_t read_cmd;
++	uint8_t program_cmd;
++	uint8_t erase_cmd;
++#endif
+ };
+ 
+ #ifdef CONFIG_SPI_NOR_SFDP_MINIMAL
+@@ -332,7 +340,7 @@ static int spi_nor_access(const struct device *const dev,
+ 			.len = length
+ 		}
+ 	};
+-
++#ifndef CONFIG_SPI_EXTENDED_MODES
+ 	buf[0] = opcode;
+ 	if (is_addressed) {
+ 		bool access_24bit = (access & NOR_ACCESS_24BIT_ADDR) != 0;
+@@ -365,7 +373,131 @@ static int spi_nor_access(const struct device *const dev,
+ 		.buffers = spi_buf,
+ 		.count = 2,
+ 	};
++#else
++
++	spi_buf[0].spi_mem_op.cmd.opcode = opcode;
++	spi_buf[0].spi_mem_op.cmd.nbytes = 1;
++
++	if (is_addressed) {
++		bool access_24bit = (access & NOR_ACCESS_24BIT_ADDR) != 0;
++		bool access_32bit = (access & NOR_ACCESS_32BIT_ADDR) != 0;
++		bool use_32bit = (access_32bit
++				  || (!access_24bit
++				      && driver_data->flag_access_32bit));
++
++		spi_buf[0].spi_mem_op.addr.nbytes = use_32bit ? 4 : 3;
++	};
++	spi_buf[0].spi_mem_op.addr.val = addr;
++	spi_buf[0].spi_mem_op.addr.buswidth = SPI_LINES_SINGLE;
++	spi_buf[0].spi_mem_op.addr.dtr = 0;
++
++	spi_buf[0].spi_mem_op.data.nbytes = length;
++	spi_buf[0].spi_mem_op.data.buf = data;
++	spi_buf[0].spi_mem_op.data.buswidth = SPI_LINES_SINGLE;
++	spi_buf[0].spi_mem_op.data.dtr = 0;
++
++
++	switch(driver_data->nor_protocol) {
++		case PROTO_1_1_1:
++			spi_buf[0].spi_mem_op.cmd.buswidth = SPI_LINES_SINGLE;
++			spi_buf[0].spi_mem_op.cmd.dtr = 0;
++			break;
++		case PROTO_1_1_2:
++			spi_buf[0].spi_mem_op.cmd.buswidth = SPI_LINES_SINGLE;
++			spi_buf[0].spi_mem_op.addr.buswidth = SPI_LINES_SINGLE;
++			spi_buf[0].spi_mem_op.data.buswidth = SPI_LINES_DUAL;
++			break;
++		case PROTO_1_2_2:
++			spi_buf[0].spi_mem_op.cmd.buswidth = SPI_LINES_SINGLE;
++			spi_buf[0].spi_mem_op.addr.buswidth = SPI_LINES_DUAL;
++			spi_buf[0].spi_mem_op.data.buswidth = SPI_LINES_DUAL;
++			break;
++		case PROTO_1_1_4:
++			spi_buf[0].spi_mem_op.cmd.buswidth = SPI_LINES_SINGLE;
++			spi_buf[0].spi_mem_op.addr.buswidth = SPI_LINES_SINGLE;
++			spi_buf[0].spi_mem_op.data.buswidth = SPI_LINES_QUAD;
++			break;
++		case PROTO_1_4_4:
++			spi_buf[0].spi_mem_op.cmd.buswidth = SPI_LINES_SINGLE;
++			spi_buf[0].spi_mem_op.addr.buswidth = SPI_LINES_QUAD;
++			spi_buf[0].spi_mem_op.addr.dtr = 1;
++			spi_buf[0].spi_mem_op.data.buswidth = SPI_LINES_QUAD;
++			spi_buf[0].spi_mem_op.data.dtr = 1;
++			break;
++		case PROTO_1_4D_4D:
++			spi_buf[0].spi_mem_op.cmd.buswidth = SPI_LINES_SINGLE;
++			spi_buf[0].spi_mem_op.addr.buswidth = SPI_LINES_QUAD;
++			spi_buf[0].spi_mem_op.data.buswidth = SPI_LINES_QUAD;
++			break;
++		case PROTO_4_4_4:
++			spi_buf[0].spi_mem_op.cmd.buswidth = SPI_LINES_QUAD;
++			spi_buf[0].spi_mem_op.cmd.dtr = 0;
++			spi_buf[0].spi_mem_op.addr.buswidth = SPI_LINES_QUAD;
++			spi_buf[0].spi_mem_op.data.buswidth = SPI_LINES_QUAD;
++			if (opcode == SPI_NOR_CMD_4READ){
++				spi_buf[0].spi_mem_op.dummy.nbytes = 6;
++			}
++			break;
++		case PROTO_8_8_8:
++			spi_buf[0].spi_mem_op.cmd.buswidth = SPI_LINES_OCTAL;
++			spi_buf[0].spi_mem_op.cmd.dtr = 0;
++			spi_buf[0].spi_mem_op.cmd.opcode = (opcode << 8) | (0xFF - opcode);
++			spi_buf[0].spi_mem_op.cmd.nbytes = 2;
++
++			spi_buf[0].spi_mem_op.addr.buswidth = SPI_LINES_OCTAL;
++			spi_buf[0].spi_mem_op.addr.dtr = 0;
++
++			if ((opcode == SPI_NOR_CMD_RDID) || (opcode == SPI_NOR_CMD_RDSR)){
++				spi_buf[0].spi_mem_op.addr.val = 0;
++				spi_buf[0].spi_mem_op.addr.buswidth = SPI_LINES_OCTAL;
++				spi_buf[0].spi_mem_op.addr.nbytes = 4;
++
++				spi_buf[0].spi_mem_op.dummy.nbytes = 4;
++			}
++			if (opcode == 0xEC){
++				spi_buf[0].spi_mem_op.dummy.nbytes = 20;
++			}
++			spi_buf[0].spi_mem_op.data.buswidth = SPI_LINES_OCTAL;
++			spi_buf[0].spi_mem_op.data.dtr = 0;
++			break;
++		case PROTO_8D_8D_8D:
++			spi_buf[0].spi_mem_op.cmd.buswidth = SPI_LINES_OCTAL;
++			spi_buf[0].spi_mem_op.cmd.dtr = 1;
++			spi_buf[0].spi_mem_op.cmd.opcode = (opcode << 8) | (0xFF - opcode);
++			spi_buf[0].spi_mem_op.cmd.nbytes = 2;
++
++			spi_buf[0].spi_mem_op.addr.buswidth = SPI_LINES_OCTAL;
++			spi_buf[0].spi_mem_op.addr.dtr = 1;
++
++			spi_buf[0].spi_mem_op.data.dtr = 1;
++
++			if ((opcode == SPI_NOR_CMD_RDID) || (opcode == SPI_NOR_CMD_RDSR)){
++				spi_buf[0].spi_mem_op.addr.val = 0;
++				spi_buf[0].spi_mem_op.addr.buswidth = SPI_LINES_OCTAL;
++				spi_buf[0].spi_mem_op.addr.nbytes = 4;
++				spi_buf[0].spi_mem_op.dummy.nbytes = 6;
++				spi_buf[0].spi_mem_op.data.dtr = 0;
++			} else if (opcode == 0xEE){
++				spi_buf[0].spi_mem_op.dummy.nbytes = 20;
++			}
++			spi_buf[0].spi_mem_op.data.buswidth = SPI_LINES_OCTAL;
++
++			break;
++		default:
++			break;
++	};
+ 
++	const struct spi_buf_set tx_set = {
++		.buffers = spi_buf,
++		.count = 1,
++	};
++
++	const struct spi_buf_set rx_set = {
++		.buffers = spi_buf,
++		.count = 1,
++	};
++
++#endif
+ 	if (is_write) {
+ 		return spi_write_dt(&driver_cfg->spi, &tx_set);
+ 	}
+@@ -683,9 +815,122 @@ static int mxicy_configure(const struct device *dev, const uint8_t *jedec_id)
+ 
+ #endif /* DT_INST_NODE_HAS_PROP(0, mxicy_mx25r_power_mode) */
+ 
++
++#ifdef CONFIG_SPI_EXTENDED_MODES
++/**
++ * @brief Write the configuration register2.
++ *
++ * @note The device must be externally acquired before invoking this
++ * function.
++ *
++ * @param dev Device struct
++ * @param sr The new value of the configuration register2
++ *
++ * @return 0 on success or a negative error code.
++ */
++static int spi_nor_wrcr2(const struct device *dev,
++			 uint8_t cr)
++{
++	int ret = spi_nor_cmd_write(dev, SPI_NOR_CMD_WREN);
++
++	if (ret == 0) {
++
++		struct spi_nor_data *data = dev->data;
++
++		data->flag_access_32bit = true;
++
++		ret = spi_nor_cmd_addr_write(dev, SPI_NOR_CMD_WR_CFGREG2, 0, &cr, sizeof(cr));
++	}
++
++	return ret;
++}
++
++static int spi_nor_change_protocol(const struct device *dev,
++		           	   enum spi_nor_protocol nor_protocol)
++{
++	struct spi_nor_data *data = dev->data;
++	uint8_t cr2;
++	int ret = 0;
++
++	switch(nor_protocol) {
++		case PROTO_1_1_1:
++			data->nor_protocol = PROTO_1_1_1;
++			data->flag_access_32bit = false;
++			data->read_cmd = SPI_NOR_CMD_READ;
++			data->program_cmd = SPI_NOR_CMD_PP;
++			data->erase_cmd = SPI_NOR_CMD_SE;
++			break;
++		case PROTO_1_1_2:
++			data->nor_protocol = PROTO_1_1_2;
++			data->flag_access_32bit = false;
++			data->read_cmd = SPI_NOR_CMD_READ;
++			data->program_cmd = SPI_NOR_CMD_PP;
++			data->erase_cmd = SPI_NOR_CMD_SE;
++			break;
++		case PROTO_1_2_2:
++			data->nor_protocol = PROTO_1_2_2;
++			data->flag_access_32bit = false;
++			data->read_cmd = SPI_NOR_CMD_READ;
++			data->program_cmd = SPI_NOR_CMD_PP;
++			data->erase_cmd = SPI_NOR_CMD_SE;
++			break;
++		case PROTO_1_1_4:
++			data->nor_protocol = PROTO_1_1_4;
++			data->flag_access_32bit = false;
++			data->read_cmd = SPI_NOR_CMD_READ;
++			data->program_cmd = SPI_NOR_CMD_PP;
++			data->erase_cmd = SPI_NOR_CMD_SE;
++			break;
++		case PROTO_1_4_4:
++			data->nor_protocol = PROTO_1_4_4;
++			data->flag_access_32bit = false;
++			data->read_cmd = SPI_NOR_CMD_READ;
++			data->program_cmd = SPI_NOR_CMD_PP;
++			data->erase_cmd = SPI_NOR_CMD_SE;
++			break;
++		case PROTO_1_4D_4D:
++			data->nor_protocol = PROTO_1_4D_4D;
++			data->flag_access_32bit = false;
++			data->read_cmd = SPI_NOR_CMD_READ;
++			data->program_cmd = SPI_NOR_CMD_PP;
++			data->erase_cmd = SPI_NOR_CMD_SE;
++			break;
++		case PROTO_4_4_4:
++			ret = spi_nor_cmd_write(dev, SPI_NOR_CMD_EQIO);
++			data->nor_protocol = PROTO_4_4_4;
++			data->flag_access_32bit = false;
++			data->read_cmd = SPI_NOR_CMD_4READ;
++			data->program_cmd = SPI_NOR_CMD_PP;
++			data->erase_cmd = SPI_NOR_CMD_SE;
++			break;
++		case PROTO_8_8_8:
++			data->flag_access_32bit = true;
++			data->read_cmd = SPI_NOR_OCMD_RD;
++			data->program_cmd = SPI_NOR_CMD_PP_4B;
++			data->erase_cmd = SPI_NOR_OCMD_SE;
++			cr2 = 0x01;
++			ret = spi_nor_wrcr2(dev, cr2);
++			data->nor_protocol = PROTO_8_8_8;
++			break;
++		case PROTO_8D_8D_8D:
++			data->flag_access_32bit = true;
++			data->read_cmd = SPI_NOR_OCMD_DTR_RD;
++			data->program_cmd = SPI_NOR_CMD_PP_4B;
++			data->erase_cmd = SPI_NOR_OCMD_SE;
++			cr2 = 0x02;
++			ret = spi_nor_wrcr2(dev, cr2);
++			data->nor_protocol = PROTO_8D_8D_8D;
++			break;
++	}
++
++	return ret;
++}
++#endif
++
+ static int spi_nor_read(const struct device *dev, off_t addr, void *dest,
+ 			size_t size)
+ {
++	struct spi_nor_data *data = dev->data;
+ 	const size_t flash_size = dev_flash_size(dev);
+ 	int ret;
+ 
+@@ -696,7 +941,7 @@ static int spi_nor_read(const struct device *dev, off_t addr, void *dest,
+ 
+ 	acquire_device(dev);
+ 
+-	ret = spi_nor_cmd_addr_read(dev, SPI_NOR_CMD_READ, addr, dest, size);
++	ret = spi_nor_cmd_addr_read(dev, data->read_cmd, addr, dest, size);
+ 
+ 	release_device(dev);
+ 	return ret;
+@@ -734,6 +979,7 @@ static int spi_nor_write(const struct device *dev, off_t addr,
+ 			 const void *src,
+ 			 size_t size)
+ {
++	struct spi_nor_data *data = dev->data;
+ 	const size_t flash_size = dev_flash_size(dev);
+ 	const uint16_t page_size = dev_page_size(dev);
+ 	int ret = 0;
+@@ -761,7 +1007,7 @@ static int spi_nor_write(const struct device *dev, off_t addr,
+ 			}
+ 
+ 			spi_nor_cmd_write(dev, SPI_NOR_CMD_WREN);
+-			ret = spi_nor_cmd_addr_write(dev, SPI_NOR_CMD_PP, addr,
++			ret = spi_nor_cmd_addr_write(dev, data->program_cmd, addr,
+ 						src, to_write);
+ 			if (ret != 0) {
+ 				break;
+@@ -1190,6 +1436,32 @@ static int setup_pages_layout(const struct device *dev)
+ #endif /* CONFIG_FLASH_PAGE_LAYOUT */
+ #endif /* CONFIG_SPI_NOR_SFDP_MINIMAL */
+ 
++#ifdef CONFIG_SPI_EXTENDED_MODES
++static enum spi_nor_protocol spi_config_get_lines(const struct spi_config *config)
++{
++	enum spi_nor_protocol nor_protocol;
++
++	switch (config->operation & SPI_LINES_MASK) {
++	case SPI_LINES_SINGLE:
++		nor_protocol = PROTO_1_1_1;
++		break;
++	case SPI_LINES_DUAL:
++		nor_protocol = PROTO_1_2_2;
++		break;
++	case SPI_LINES_QUAD:
++		nor_protocol = PROTO_4_4_4;
++		break;
++	case SPI_LINES_OCTAL:
++		nor_protocol = PROTO_8_8_8;
++		break;
++	default:
++		nor_protocol = PROTO_1_1_1;
++	}
++
++	return nor_protocol;
++}
++#endif
++
+ /**
+  * @brief Configure the flash
+  *
+@@ -1265,6 +1537,17 @@ static int spi_nor_configure(const struct device *dev)
+ 	}
+ #endif
+ 
++#ifdef CONFIG_SPI_EXTENDED_MODES
++
++	rc = spi_nor_change_protocol(dev, spi_config_get_lines(spi_cfg));
++	//rc = spi_nor_change_protocol(dev, PROTO_8_8_8);
++	//rc = spi_nor_change_protocol(dev, PROTO_8D_8D_8D);
++	if (rc != 0) {
++		LOG_ERR("Change protocol failed: %d", rc);
++		return -ENODEV;
++	}
++#endif
++
+ 	/* Check for block protect bits that need to be cleared.  This
+ 	 * information cannot be determined from SFDP content, so the
+ 	 * devicetree node property must be set correctly for any device
+diff --git a/drivers/flash/spi_nor.h b/drivers/flash/spi_nor.h
+index 8d54cc61508..8c0fb84ff92 100644
+--- a/drivers/flash/spi_nor.h
++++ b/drivers/flash/spi_nor.h
+@@ -59,13 +59,15 @@
+ #define SPI_NOR_CMD_PP_4B        0x12  /* Page Program 4 Byte Address */
+ #define SPI_NOR_CMD_PP_1_1_4_4B  0x34  /* Quad Page program (1-1-4) 4 Byte Address */
+ #define SPI_NOR_CMD_PP_1_4_4_4B  0x3e  /* Quad Page program (1-4-4) 4 Byte Address */
++#define SPI_NOR_CMD_EQIO         0x35  /* Enable QPI mode */
++#define SPI_NOR_CMD_RSTQIO       0xF5  /* Disable QPI mode */
+ 
+ /* Flash octal opcodes */
+-#define SPI_NOR_OCMD_SE         0x21DE  /* Octal Sector erase */
++#define SPI_NOR_OCMD_SE         0x21  /* Octal Sector erase */
+ #define SPI_NOR_OCMD_CE         0xC738  /* Octal Chip erase */
+ #define SPI_NOR_OCMD_RDSR       0x05FA  /* Octal Read status register */
+-#define SPI_NOR_OCMD_DTR_RD     0xEE11  /* Octal IO DTR read command */
+-#define SPI_NOR_OCMD_RD         0xEC13  /* Octal IO read command */
++#define SPI_NOR_OCMD_DTR_RD     0xEE  /* Octal IO DTR read command */
++#define SPI_NOR_OCMD_RD         0xEC  /* Octal IO read command */
+ #define SPI_NOR_OCMD_PAGE_PRG   0x12ED  /* Octal Page Prog */
+ #define SPI_NOR_OCMD_WREN       0x06F9  /* Octal Write enable */
+ #define SPI_NOR_OCMD_NOP        0x00FF  /* Octal No operation */
+diff --git a/drivers/spi/CMakeLists.txt b/drivers/spi/CMakeLists.txt
+index 956b6d3397a..8f2d4932753 100644
+--- a/drivers/spi/CMakeLists.txt
++++ b/drivers/spi/CMakeLists.txt
+@@ -9,6 +9,7 @@ zephyr_library_sources_ifdef(CONFIG_SPI_CC13XX_CC26XX		spi_cc13xx_cc26xx.c)
+ zephyr_library_sources_ifdef(CONFIG_SPI_DW		spi_dw.c)
+ zephyr_library_sources_ifdef(CONFIG_SPI_EMUL		spi_emul.c)
+ zephyr_library_sources_ifdef(CONFIG_SPI_STM32		spi_ll_stm32.c)
++zephyr_library_sources_ifdef(CONFIG_OSPI_STM32		ospi_ll_stm32.c)
+ zephyr_library_sources_ifdef(CONFIG_SPI_MCUX_DSPI	spi_mcux_dspi.c)
+ zephyr_library_sources_ifdef(CONFIG_SPI_MCUX_FLEXCOMM	spi_mcux_flexcomm.c)
+ zephyr_library_sources_ifdef(CONFIG_SPI_MCUX_LPSPI	spi_mcux_lpspi.c)
+diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
+index 24982cae90e..eb9cc3dce00 100644
+--- a/drivers/spi/Kconfig
++++ b/drivers/spi/Kconfig
+@@ -69,6 +69,8 @@ source "drivers/spi/Kconfig.b91"
+ 
+ source "drivers/spi/Kconfig.stm32"
+ 
++source "drivers/spi/Kconfig.stm32_ospi"
++
+ source "drivers/spi/Kconfig.dw"
+ 
+ source "drivers/spi/Kconfig.mcux_dspi"
+diff --git a/drivers/spi/Kconfig.stm32_ospi b/drivers/spi/Kconfig.stm32_ospi
+new file mode 100644
+index 00000000000..e057b115225
+--- /dev/null
++++ b/drivers/spi/Kconfig.stm32_ospi
+@@ -0,0 +1,40 @@
++# STM32 SPI driver configuration options
++
++# Copyright (c) 2015-2016 Intel Corporation
++# SPDX-License-Identifier: Apache-2.0
++
++menuconfig OSPI_STM32
++	bool "STM32 MCU OSPI controller driver"
++	default y
++	depends on SOC_FAMILY_STM32
++	select USE_STM32_LL_OSPI
++	select USE_STM32_HAL_OSPI
++	help
++	  Enable OSPI support on the STM32 family of processors.
++
++config SPI_EXTENDED_MODES
++	bool "STM32 Hardware Slave Select support"
++	default y
++
++#if SPI_STM32
++
++#config SPI_STM32_INTERRUPT
++#	bool "STM32 MCU SPI Interrupt Support"
++#	help
++#	  Enable Interrupt support for the SPI Driver of STM32 family.
++
++#config SPI_STM32_DMA
++#	bool "STM32 MCU SPI DMA Support"
++#	select DMA
++#	help
++#	  Enable the SPI DMA mode for SPI instances
++#	  that enable dma channels in their device tree node.
++
++#config SPI_STM32_USE_HW_SS
++#	bool "STM32 Hardware Slave Select support"
++#	default y
++#	help
++#	  Use Slave Select pin instead of software Slave Select.
++
++
++#endif # SPI_STM32
+diff --git a/drivers/spi/ospi_ll_stm32.c b/drivers/spi/ospi_ll_stm32.c
+new file mode 100644
+index 00000000000..e9665d64702
+--- /dev/null
++++ b/drivers/spi/ospi_ll_stm32.c
+@@ -0,0 +1,388 @@
++/*
++ * Copyright (c) 2022 Macronix.
++ *
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++#define DT_DRV_COMPAT st_stm32_ospi
++
++#define LOG_LEVEL CONFIG_SPI_LOG_LEVEL
++#include <logging/log.h>
++LOG_MODULE_REGISTER(ospi_ll_stm32);
++
++#include <zephyr/sys/util.h>
++#include <zephyr/kernel.h>
++#include <soc.h>
++#include <stm32_ll_spi.h>
++#include <errno.h>
++#include <drivers/spi.h>
++#include <toolchain.h>
++
++#include <zephyr/drivers/pinctrl.h>
++#include <zephyr/drivers/clock_control/stm32_clock_control.h>
++#include <zephyr/drivers/clock_control.h>
++
++#include "ospi_ll_stm32.h"
++
++#define DEV_CFG(dev)						\
++(const struct ospi_stm32_config * const)(dev->config)
++
++#define DEV_DATA(dev)					\
++(struct ospi_stm32_data * const)(dev->data)
++
++#define STM32_OSPI_FIFO_THRESHOLD         8
++#define STM32_OSPI_CLOCK_PRESCALER_MAX  255
++
++
++/*
++ * Prepare a command over OSPI bus.
++ */
++
++static int ospi_prepare_command(const struct device *dev, 
++				const struct spi_buf_set *bufs, 
++				OSPI_RegularCmdTypeDef *st_command)
++{
++	struct spi_mem_op_t spi_mem_op = bufs->buffers[0].spi_mem_op;
++
++	st_command->FlashId = HAL_OSPI_FLASH_ID_1;
++	st_command->SIOOMode = HAL_OSPI_SIOO_INST_EVERY_CMD;
++	st_command->OperationType = HAL_OSPI_OPTYPE_COMMON_CFG;
++	st_command->DQSMode = (spi_mem_op.cmd.dtr) ? HAL_OSPI_DQS_ENABLE : HAL_OSPI_DQS_DISABLE;
++
++	st_command->Instruction = spi_mem_op.cmd.opcode;
++
++	switch (spi_mem_op.cmd.buswidth) {
++            case SPI_LINES_SINGLE:
++                st_command->InstructionMode = HAL_OSPI_INSTRUCTION_1_LINE;
++                break;
++            case SPI_LINES_DUAL:
++                st_command->InstructionMode = HAL_OSPI_INSTRUCTION_2_LINES;
++                break;
++            case SPI_LINES_QUAD:
++                st_command->InstructionMode = HAL_OSPI_INSTRUCTION_4_LINES;
++                break;
++            case SPI_LINES_OCTAL:
++                st_command->InstructionMode = HAL_OSPI_INSTRUCTION_8_LINES;
++                break;
++            default:
++                LOG_ERR("Command param error: wrong instruction format\n");
++                return -EIO;
++        }
++
++	st_command->InstructionSize    = (st_command->InstructionMode == HAL_OSPI_INSTRUCTION_8_LINES) ? HAL_OSPI_INSTRUCTION_16_BITS : HAL_OSPI_INSTRUCTION_8_BITS;
++	st_command->InstructionDtrMode = (spi_mem_op.cmd.dtr) ? HAL_OSPI_INSTRUCTION_DTR_ENABLE : HAL_OSPI_INSTRUCTION_DTR_DISABLE;
++
++	if (spi_mem_op.addr.nbytes == 0) {
++		st_command->AddressMode = HAL_OSPI_ADDRESS_NONE;
++		st_command->AddressSize = 0;
++		st_command->Address = 0;
++	} else {
++
++		st_command->Address = spi_mem_op.addr.val;
++
++		switch (spi_mem_op.addr.buswidth) {
++			case SPI_LINES_SINGLE:
++				st_command->AddressMode = HAL_OSPI_ADDRESS_1_LINE;
++				break;
++			case SPI_LINES_DUAL:
++				st_command->AddressMode = HAL_OSPI_ADDRESS_2_LINES;
++				break;
++			case SPI_LINES_QUAD:
++				st_command->AddressMode = HAL_OSPI_ADDRESS_4_LINES;
++				break;
++			case SPI_LINES_OCTAL:
++				st_command->AddressMode = HAL_OSPI_ADDRESS_8_LINES;
++				break;
++			default:
++				LOG_ERR("Command param error: wrong address size\n");
++				return -EIO;
++		}
++		switch (spi_mem_op.addr.nbytes) {
++			case 1:
++				st_command->AddressSize = HAL_OSPI_ADDRESS_8_BITS;
++				break;
++			case 2:
++				st_command->AddressSize = HAL_OSPI_ADDRESS_16_BITS;
++				break;
++			case 3:
++				st_command->AddressSize = HAL_OSPI_ADDRESS_24_BITS;
++				break;
++			case 4:
++				st_command->AddressSize = HAL_OSPI_ADDRESS_32_BITS;
++				break;
++			default:
++				LOG_ERR("Command param error: wrong address size\n");
++				return -EIO;
++		}
++	}
++	st_command->AddressDtrMode = (spi_mem_op.addr.dtr) ? HAL_OSPI_ADDRESS_DTR_ENABLE : HAL_OSPI_ADDRESS_DTR_DISABLE;   
++
++	st_command->DummyCycles = spi_mem_op.dummy.nbytes;
++
++	switch (spi_mem_op.data.buswidth) {
++		case SPI_LINES_SINGLE:
++			st_command->DataMode = HAL_OSPI_DATA_1_LINE;
++			break;
++		case SPI_LINES_DUAL:
++			st_command->DataMode = HAL_OSPI_DATA_2_LINES;
++			break;
++		case SPI_LINES_QUAD:
++			st_command->DataMode = HAL_OSPI_DATA_4_LINES;
++			break;
++		case SPI_LINES_OCTAL:
++			st_command->DataMode = HAL_OSPI_DATA_8_LINES;
++			break;
++		default:
++			st_command->DataMode = HAL_OSPI_DATA_NONE;
++			return -EIO;
++	}
++	st_command->DataDtrMode = (spi_mem_op.data.dtr) ? HAL_OSPI_DATA_DTR_ENABLE : HAL_OSPI_DATA_DTR_DISABLE;
++ 
++	return 0;
++}
++
++/*
++ * Send a command over OSPI bus.
++ */
++static int ospi_send_cmd(const struct device *dev, OSPI_RegularCmdTypeDef *cmd)
++{
++	const struct ospi_stm32_config *dev_cfg = DEV_CFG(dev);
++	struct ospi_stm32_data *dev_data = DEV_DATA(dev);
++	HAL_StatusTypeDef hal_ret;
++
++	ARG_UNUSED(dev_cfg);
++
++	LOG_DBG("ospi_send_cmd Instruction 0x%x", cmd->Instruction);
++
++	cmd->DataMode = HAL_OSPI_DATA_NONE; /* Instruction only */
++
++	hal_ret = HAL_OSPI_Command(&dev_data->hospi, cmd, HAL_OSPI_TIMEOUT_DEFAULT_VALUE);
++	if (hal_ret != HAL_OK) {
++		LOG_ERR("%d: Failed to send OSPI instruction", hal_ret);
++		return -EIO;
++	}
++	LOG_DBG("CCR 0x%x", dev_cfg->regs->CCR);
++
++	return hal_ret;
++}
++
++/*
++ * Perform a read access over OSPI bus.
++ */
++static int ospi_read_access(const struct device *dev, OSPI_RegularCmdTypeDef *cmd,
++			    uint8_t *data, size_t size)
++{
++	const struct ospi_stm32_config *dev_cfg = DEV_CFG(dev);
++	struct ospi_stm32_data *dev_data = DEV_DATA(dev);
++	HAL_StatusTypeDef hal_ret;
++
++	ARG_UNUSED(dev_cfg);
++
++	cmd->NbData = size;
++
++	hal_ret = HAL_OSPI_Command(&dev_data->hospi, cmd, HAL_OSPI_TIMEOUT_DEFAULT_VALUE);
++	if (hal_ret != HAL_OK) {
++		LOG_ERR("%d: Failed to send OSPI instruction", hal_ret);
++		return -EIO;
++	}
++
++	hal_ret = HAL_OSPI_Receive(&dev_data->hospi, data, HAL_OSPI_TIMEOUT_DEFAULT_VALUE);
++	if (hal_ret != HAL_OK) {
++		LOG_ERR("%d: Failed to read data", hal_ret);
++		return -EIO;
++	}
++
++	return hal_ret;
++}
++
++/*
++ * Perform a write access over OSPI bus.
++ */
++static int ospi_write_access(const struct device *dev, OSPI_RegularCmdTypeDef *cmd,
++			     const uint8_t *data, size_t size)
++{
++	const struct ospi_stm32_config *dev_cfg = DEV_CFG(dev);
++	struct ospi_stm32_data *dev_data = DEV_DATA(dev);
++	HAL_StatusTypeDef hal_ret;
++
++	ARG_UNUSED(dev_cfg);
++
++	LOG_DBG("Instruction 0x%x", cmd->Instruction);
++
++	cmd->NbData = size;
++
++	hal_ret = HAL_OSPI_Command(&dev_data->hospi, cmd, HAL_OSPI_TIMEOUT_DEFAULT_VALUE);
++	if (hal_ret != HAL_OK) {
++		LOG_ERR("%d: Failed to send OSPI instruction", hal_ret);
++		return -EIO;
++	}
++
++	hal_ret = HAL_OSPI_Transmit(&dev_data->hospi, (uint8_t *)data, HAL_OSPI_TIMEOUT_DEFAULT_VALUE);
++
++	if (hal_ret != HAL_OK) {
++		LOG_ERR("%d: Failed to read data", hal_ret);
++		return -EIO;
++	}
++	LOG_DBG("CCR 0x%x", dev_cfg->regs->CCR);
++
++	return hal_ret;
++}
++
++
++static int transceive(const struct device *dev,
++		      const struct spi_config *config,
++		      const struct spi_buf_set *tx_bufs,
++		      const struct spi_buf_set *rx_bufs,
++		      bool asynchronous, struct k_poll_signal *signal)
++{
++	int ret;
++
++	if (!tx_bufs && !rx_bufs) {
++		return 0;
++	}
++
++	OSPI_RegularCmdTypeDef cmd;
++	memset(&cmd, 0 ,sizeof(OSPI_RegularCmdTypeDef));
++
++	/* read command */
++	if (rx_bufs) {
++
++		ret = ospi_prepare_command(dev, rx_bufs, &cmd);
++
++		ret = ospi_read_access(dev, &cmd, rx_bufs->buffers[0].spi_mem_op.data.buf, rx_bufs->buffers[0].spi_mem_op.data.nbytes);
++
++		if (ret != 0) {
++			return -EIO;
++		} else {
++			return ret;
++		}
++	} else {
++		ret = ospi_prepare_command(dev, tx_bufs, &cmd);
++
++		if (tx_bufs->buffers[0].spi_mem_op.data.nbytes == 0) { /* no address and no send data */
++			ret = ospi_send_cmd(dev, &cmd);
++		} else {
++			ret = ospi_write_access(dev, &cmd, tx_bufs->buffers[0].spi_mem_op.data.buf, tx_bufs->buffers[0].spi_mem_op.data.nbytes);
++		}
++	}
++
++	return ret;
++}
++
++static int ospi_stm32_transceive(const struct device *dev,
++				const struct spi_config *config,
++				const struct spi_buf_set *tx_bufs,
++				const struct spi_buf_set *rx_bufs)
++{
++	return transceive(dev, config, tx_bufs, rx_bufs, false, NULL);
++}
++
++
++
++
++static int ospi_stm32_release(const struct device *dev,
++			     const struct spi_config *config)
++{
++	struct ospi_stm32_data *data = DEV_DATA(dev);
++
++	spi_context_unlock_unconditionally(&data->ctx);
++
++	return 0;
++}
++
++static const struct spi_driver_api ospi_stm32_driver_api = {
++	.transceive = ospi_stm32_transceive,
++#ifdef CONFIG_SPI_ASYNC
++	//.transceive_async = ospi_stm32_transceive_async,
++#endif
++	.release = ospi_stm32_release,
++};
++
++static int ospi_stm32_init(const struct device *dev)
++{
++	struct ospi_stm32_data *data __attribute__((unused)) = dev->data;
++	const struct ospi_stm32_config *dev_cfg = dev->config;
++	uint32_t ahb_clock_freq;
++	int err;
++
++	err = pinctrl_apply_state(dev_cfg->pcfg, PINCTRL_STATE_DEFAULT);
++	if (err < 0) {
++		LOG_ERR("SPI pinctrl setup failed (%d)", err);
++		return err;
++	}
++
++	/* Clock configuration */
++	if (clock_control_on(DEVICE_DT_GET(STM32_CLOCK_CONTROL_NODE),
++			       (clock_control_subsys_t) &dev_cfg->pclken) != 0) {
++		LOG_ERR("Could not enable OSPI clock");
++		return -EIO;
++	}
++
++	if (clock_control_get_rate(DEVICE_DT_GET(STM32_CLOCK_CONTROL_NODE),
++			(clock_control_subsys_t) &dev_cfg->pclken,
++			&ahb_clock_freq) < 0) {
++		LOG_DBG("Failed to get AHB clock frequency");
++		return -EIO;
++	}
++
++	__ASSERT_NO_MSG(prescaler <= STM32_OSPI_CLOCK_PRESCALER_MAX);
++
++	/* Initialize OSPI HAL */
++	data->hospi.State = HAL_OSPI_STATE_RESET;
++
++	data->hospi.Init.DualQuad = HAL_OSPI_DUALQUAD_DISABLE;
++//#if defined(TARGET_MX25LM512451G)
++//	obj->handle.Init.MemoryType = HAL_OSPI_MEMTYPE_MACRONIX; // Read sequence in DTR mode: D1-D0-D3-D2
++//#else
++	data->hospi.Init.MemoryType = HAL_OSPI_MEMTYPE_MICRON;   // Read sequence in DTR mode: D0-D1-D2-D3
++	data->hospi.Init.ClockPrescaler = 4; // default value, will be overwritten in ospi_frequency
++	data->hospi.Init.FifoThreshold = 4;
++	data->hospi.Init.SampleShifting = HAL_OSPI_SAMPLE_SHIFTING_NONE;
++	data->hospi.Init.DeviceSize = 32;
++	data->hospi.Init.ChipSelectHighTime = 3;
++	data->hospi.Init.FreeRunningClock = HAL_OSPI_FREERUNCLK_DISABLE;
++	data->hospi.Init.WrapSize = HAL_OSPI_WRAP_NOT_SUPPORTED;
++	data->hospi.Init.ClockMode = HAL_OSPI_CLOCK_MODE_0;
++	data->hospi.Init.DelayHoldQuarterCycle = HAL_OSPI_DHQC_ENABLE;
++	data->hospi.Init.ChipSelectBoundary = 0;
++	data->hospi.Init.DelayBlockBypass = HAL_OSPI_DELAY_BLOCK_USED;
++
++	data->hospi.Init.Refresh = 0;
++
++	HAL_OSPI_Init(&data->hospi);
++
++	spi_context_unlock_unconditionally(&data->ctx);
++
++	return 0;
++}
++
++PINCTRL_DT_INST_DEFINE(0);
++
++
++static const struct ospi_stm32_config ospi_stm32_cfg = {
++	.regs = (OCTOSPI_TypeDef *)DT_INST_REG_ADDR(0),
++	.pclken = {
++		.enr = DT_INST_CLOCKS_CELL(0, bits),
++		.bus = DT_INST_CLOCKS_CELL(0, bus)
++	},
++	.pcfg = PINCTRL_DT_INST_DEV_CONFIG_GET(0),
++};
++
++static struct ospi_stm32_data ospi_stm32_dev_data = {
++	.hospi = {
++		.Instance = (OCTOSPI_TypeDef *)DT_INST_REG_ADDR(0),
++		.Init = {
++			.FifoThreshold = STM32_OSPI_FIFO_THRESHOLD,
++			.SampleShifting = HAL_OSPI_SAMPLE_SHIFTING_NONE,
++			.ChipSelectHighTime = 0,
++			.ClockMode = HAL_OSPI_CLOCK_MODE_0,
++			},
++	},
++	SPI_CONTEXT_INIT_LOCK(ospi_stm32_dev_data, ctx),
++	SPI_CONTEXT_INIT_SYNC(ospi_stm32_dev_data, ctx)
++};
++
++DEVICE_DT_INST_DEFINE(0, &ospi_stm32_init, NULL,
++		      &ospi_stm32_dev_data, &ospi_stm32_cfg,
++		      POST_KERNEL, CONFIG_KERNEL_INIT_PRIORITY_DEVICE,
++		      &ospi_stm32_driver_api);
+diff --git a/drivers/spi/ospi_ll_stm32.h b/drivers/spi/ospi_ll_stm32.h
+new file mode 100644
+index 00000000000..ba9e3e2d3f3
+--- /dev/null
++++ b/drivers/spi/ospi_ll_stm32.h
+@@ -0,0 +1,47 @@
++/*
++ * Copyright (c) 2022 Macronix.
++ *
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++#ifndef ZEPHYR_DRIVERS_SPI_OSPI_LL_STM32_H_
++#define ZEPHYR_DRIVERS_SPI_OSPI_LL_STM32_H_
++
++#include "spi_context.h"
++
++struct ospi_stm32_config {
++        OCTOSPI_TypeDef *regs;
++	struct stm32_pclken pclken;
++	const struct pinctrl_dev_config *pcfg;
++};
++
++struct ospi_stm32_data {
++	OSPI_HandleTypeDef hospi;
++	struct spi_context ctx;
++};
++
++/**
++ * @name OSPI definition for the OctoSPI peripherals
++ * Note that the possible combination is
++ *  SPI mode in STR transfer rate
++ *  OPI mode in STR transfer rate
++ *  OPI mode in DTR transfer rate
++ */
++
++/* OSPI mode operating on 1 line, 2 lines, 4 lines or 8 lines */
++/* 1 Cmd Line, 1 Address Line and 1 Data Line    */
++#define OSPI_SPI_MODE                     1
++/* 2 Cmd Lines, 2 Address Lines and 2 Data Lines */
++#define OSPI_DUAL_MODE                    2
++/* 4 Cmd Lines, 4 Address Lines and 4 Data Lines */
++#define OSPI_QUAD_MODE                    4
++/* 8 Cmd Lines, 8 Address Lines and 8 Data Lines */
++#define OSPI_OPI_MODE                     8
++
++/* OSPI mode operating on Single or Double Transfer Rate */
++/* Single Transfer Rate */
++#define OSPI_STR_TRANSFER                 1
++/* Double Transfer Rate */
++#define OSPI_DTR_TRANSFER                 2
++
++#endif	/* ZEPHYR_DRIVERS_SPI_OSPI_LL_STM32_H_ */
+diff --git a/dts/bindings/spi/spi-device.yaml b/dts/bindings/spi/spi-device.yaml
+index 6915b664890..79e4a45045f 100644
+--- a/dts/bindings/spi/spi-device.yaml
++++ b/dts/bindings/spi/spi-device.yaml
+@@ -5,7 +5,6 @@
+ 
+ include: [base.yaml, power.yaml]
+ 
+-on-bus: spi
+ 
+ properties:
+   reg:
+diff --git a/include/zephyr/drivers/spi.h b/include/zephyr/drivers/spi.h
+index fa3b8834c9e..bf9e5ceb3cc 100644
+--- a/include/zephyr/drivers/spi.h
++++ b/include/zephyr/drivers/spi.h
+@@ -414,7 +414,51 @@ struct spi_dt_spec {
+ struct spi_buf {
+ 	void *buf;
+ 	size_t len;
++#ifdef CONFIG_SPI_EXTENDED_MODES
++	struct spi_mem_op_t {
++		struct {
++			uint8_t nbytes;
++			uint32_t buswidth;
++			uint8_t dtr : 1;
++			uint16_t opcode;
++		} cmd;
++
++		struct {
++			uint8_t nbytes;
++			uint32_t buswidth;
++			uint8_t dtr : 1;
++			uint64_t val;
++		} addr;
++
++		struct {
++			uint8_t nbytes;
++			uint32_t buswidth;
++			uint8_t dtr : 1;
++		} dummy;
++
++		struct {
++			uint32_t buswidth;
++			uint8_t dtr : 1;
++			unsigned int nbytes;
++			void *buf;
++		} data;
++	} spi_mem_op;
++#endif
++};
++
++#ifdef CONFIG_SPI_EXTENDED_MODES
++enum spi_nor_protocol {
++	PROTO_1_1_1,
++	PROTO_1_1_2,
++	PROTO_1_2_2,
++	PROTO_1_1_4,
++	PROTO_1_4_4,
++	PROTO_1_4D_4D,
++	PROTO_4_4_4,
++	PROTO_8_8_8,
++	PROTO_8D_8D_8D,
+ };
++#endif
+ 
+ /**
+  * @brief SPI buffer array structure

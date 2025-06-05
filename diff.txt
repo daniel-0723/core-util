@@ -1,0 +1,68 @@
+diff --git a/drivers/flash/diff --git a/drivers/flash/spi_nor.c b/d.diff b/drivers/flash/diff --git a/drivers/flash/spi_nor.c b/d.diff
+new file mode 100644
+--- /dev/null
++++ b/drivers/flash/diff --git a/drivers/flash/spi_nor.c b/d.diff
+@@ -0,0 +1,64 @@
++diff --git a/drivers/flash/spi_nor.c b/drivers/flash/spi_nor.c
++--- drivers/flash/spi_nor.c
+++++ drivers/flash/spi_nor.c
++@@ -1048,16 +1048,19 @@
++ 	}
++ 
++ 	acquire_device(dev);
++ 
+++	bool use_extended_modes = IS_ENABLED(CONFIG_SPI_EXTENDED_MODES);
+++	uint8_t read_cmd = use_extended_modes ? data->read_cmd : SPI_NOR_CMD_PP;
+++
++ 	if (IS_ENABLED(ANY_INST_USE_4B_ADDR_OPCODES) && DEV_CFG(dev)->use_4b_addr_opcodes) {
++ 		if (addr > SPI_NOR_3B_ADDR_MAX) {
++ 			ret = spi_nor_cmd_addr_read_4b(dev, SPI_NOR_CMD_READ_4B, addr, dest, size);
++ 		} else {
++-			ret = spi_nor_cmd_addr_read_3b(dev, data->read_cmd, addr, dest, size);
+++			ret = spi_nor_cmd_addr_read_3b(dev, read_cmd, addr, dest, size);
++ 		}
++ 	} else {
++-		ret = spi_nor_cmd_addr_read(dev, data->read_cmd, addr, dest, size);
+++		ret = spi_nor_cmd_addr_read(dev, read_cmd, addr, dest, size);
++ 	}
++ 
++ 	release_device(dev);
++ 
++@@ -1140,20 +1143,23 @@
++ 			if (ret != 0) {
++ 				break;
++ 			}
++ 
+++			bool use_extended_modes = IS_ENABLED(CONFIG_SPI_EXTENDED_MODES);
+++			uint8_t program_cmd = use_extended_modes ? data->program_cmd : SPI_NOR_CMD_PP;
+++			
++ 			if (IS_ENABLED(ANY_INST_USE_4B_ADDR_OPCODES) &&
++ 			    DEV_CFG(dev)->use_4b_addr_opcodes) {
++ 				if (addr > SPI_NOR_3B_ADDR_MAX) {
++ 					ret = spi_nor_cmd_addr_write_4b(dev, SPI_NOR_CMD_PP_4B,
++ 									addr, src, to_write);
++ 				} else {
++-					ret = spi_nor_cmd_addr_write_3b(dev, data->program_cmd,
+++					ret = spi_nor_cmd_addr_write_3b(dev, program_cmd,
++ 									addr, src, to_write);
++ 				}
++ 			} else {
++-				ret = spi_nor_cmd_addr_write(dev, data->program_cmd, addr, src,
++-							     to_write);
+++				ret = spi_nor_cmd_addr_write(dev, program_cmd, addr, src,
+++					to_write);
++ 			}
++ 
++ 			if (ret != 0) {
++ 				break;
++@@ -1783,9 +1789,9 @@
++ #endif
++ 
++ #ifdef CONFIG_SPI_EXTENDED_MODES
++ 
++-	rc = spi_nor_change_protocol(dev, spi_config_get_lines(spi_cfg));
+++	rc = spi_nor_change_protocol(dev, spi_config_get_lines(&cfg->spi.config));
++ 	if (rc != 0) {
++ 		LOG_ERR("Change protocol failed: %d", rc);
++ 		return -ENODEV;
++ 	}
